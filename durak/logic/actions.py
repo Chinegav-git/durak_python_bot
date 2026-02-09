@@ -27,55 +27,71 @@ async def win(game: Game, player: Player):
 
 
 async def do_turn(game: Game, skip_def: bool = False):
-    """errors:
-    ...
+    """
+    Handles the turn transition, checks for winners, and ends the game if necessary.
+    This function is the heart of the game flow control.
     """
     chat = game.chat
     bot = Bot.get_current()
 
-    # Check for players with no cards BEFORE rotating attacker.
-    for pl in list(game.players):
-        if pl.cards:
-            continue
-
-        # If game is not in final phase, the first player who ran out wins.
-        if not game.is_final:
-            await win(game, pl)
-
-            try:
-                await do_leave_player(pl, from_turn=True)
-            except NotEnoughPlayersError:
+    # A loop is used to re-evaluate the game state from the beginning
+    # whenever a player leaves the game. This simplifies the logic by
+    # ensuring checks are always run against the current list of players.
+    while True:
+        # Pre-check: If only one player remains for any reason, the game is over.
+        if len(game.players) <= 1:
+            # The game might have already been ended by a previous call that led here.
+            # Checking if the game is still in the manager prevents double-ending.
+            if gm.get_game_from_chat(chat):
                 gm.end_game(game.chat)
                 await bot.send_message(chat.id, '🎮 Гра завершена!')
-                return
-
-            # After a player leaves, re-check if the game should end.
-            if len(game.players) <= 1:
-                # This means the game is over. No need to proceed to turn rotation.
-                gm.end_game(game.chat)
-                await bot.send_message(chat.id, '🎮 Гра завершена!')
-                return
-
-            try:
-                game = gm.get_game_from_chat(chat)
-            except NoGameInChatError:
-                await bot.send_message(chat.id, '🎮 Гра завершена!')
-                return
-        else:
-            # Final phase: if both players have no cards -> draw, else current attacker wins.
-            # Here `game.current_player` and `game.opponent_player` refer to the
-            # attacker/opponent at the moment before turn rotation, which is
-            # the correct reference for resolving final-phase results.
-            if not game.opponent_player.cards and not game.current_player.cards:
-                gm.end_game(game.chat)
-                await bot.send_message(chat.id, "🤝 Відбулася нічия :>")
-            else:
-                await win(game, game.current_player)
-
-            await bot.send_message(chat.id, '🎮 Гра завершена!')
             return
 
-    # Now perform turn rotation and refill hands for next attacker.
+        player_has_left = False
+        for player in list(game.players):
+            # A player wins if they have no cards left and the game is not in the final attack.
+            if not player.cards:
+                if not game.is_final:
+                    await win(game, player)
+                    try:
+                        # The player is removed from the game.
+                        await do_leave_player(player, from_turn=True)
+                        player_has_left = True
+                        # Break the inner 'for' loop to restart the 'while' loop
+                        # with the updated player list.
+                        break
+                    except NotEnoughPlayersError:
+                        # This exception means only one player is left after leaving.
+                        if gm.get_game_from_chat(chat):
+                            gm.end_game(game.chat)
+                            await bot.send_message(chat.id, '🎮 Гра завершена!')
+                        return
+                else:
+                    # FINAL PHASE LOGIC
+                    # This block executes when the attacker plays their last card and
+                    # the deck is empty.
+                    if not game.opponent_player.cards and not game.current_player.cards:
+                        # If the defender also has no cards, it's a draw.
+                        await bot.send_message(chat.id, "🤝 Відбулася нічия :>")
+                    else:
+                        # Otherwise, the attacker (current_player) is the winner.
+                        await win(game, game.current_player)
+
+                    # End the game regardless of draw or win.
+                    if gm.get_game_from_chat(chat):
+                        gm.end_game(game.chat)
+                        await bot.send_message(chat.id, '🎮 Гра завершена!')
+                    return
+
+        # If a player left, restart the 'while' loop to re-evaluate the new game state.
+        if player_has_left:
+            continue
+        # If the 'for' loop completed without any player leaving, it means it's a normal turn.
+        # We can break the 'while' loop and proceed to the next turn.
+        else:
+            break
+
+    # If the game hasn't ended, proceed with the normal turn rotation.
     game.turn(skip_def=skip_def)
 
     

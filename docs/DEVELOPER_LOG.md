@@ -1,5 +1,8 @@
 # Developer Log
 
+### 2024-07-27
+- **BUGFIX:** Refactored the `do_turn` function in `durak/logic/actions.py` to correctly handle game completion. The previous implementation had a logical flaw where the game would not reliably end when a player won, especially in a two-player scenario. The new logic uses a `while` loop to re-evaluate the game state after a player leaves, ensuring the game ends immediately if only one player remains. This also resolved a potential issue with the final game phase (draw/win) logic.
+
 ### 2024-07-26
 - **ACTION:** Initialized the developer log.
 - **ACTION:** Performed a full audit of the codebase from the `Chinegav-git/durak_python_bot` repository.

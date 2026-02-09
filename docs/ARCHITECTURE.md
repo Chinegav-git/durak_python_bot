@@ -46,9 +46,9 @@ The project is organized into a primary Python package `durak/` with a clear sep
 - **Asynchronous First:** All I/O operations (Telegram API, Database) are built on Python's `async/await` syntax.
 - **Separation of Concerns:**
     - **Handlers (`durak/handlers/`):** Responsible only for receiving and parsing user input from Telegram. They call services to perform business logic.
-    - **Services (`durak/logic/`):** Contain the core game logic, state management, and business rules. They are independent of the Telegram API.
+    - **Services (`durak/logic/`):** Contain the core game logic, business rules, and state management. They are independent of the Telegram API. The `do_turn` function in `actions.py` is the central controller for the game's flow, managing turn transitions and win/loss conditions.
     - **Database (`durak/db/`):** Manages data persistence and defines the data models.
-- **State Management:** Game state is intended to be managed in memory, likely within the `GameManager` service. The database stores user statistics and settings.
+- **State Management:** Active game sessions are managed in-memory by the `GameManager` (`logic/game_manager.py`), which is responsible for creating, tracking, and ending games. The core game state for each session is encapsulated within `Game` objects. The database (`durak/db/`) is used for long-term persistence of user statistics and settings.
 
 ## 4. Visual Engine
 The project includes a visual component using image assets from the `img/` directory, suggesting that it renders game states as images before sending them to the user.
