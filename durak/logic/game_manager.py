@@ -70,7 +70,7 @@ class GameManager:
             return
         raise NoGameInChatError
         
-    async def test_win(self, game: Game, winner_id: int = None):
+    async def test_win_game(self, game: Game, winner_id: int):
         '''
         Завершает игру и объявляет победителя для теста.
         '''
@@ -79,12 +79,9 @@ class GameManager:
             # Этого не должно произойти при правильном запуске.
             return
 
-        if winner_id:
-            winner = game.player_for_id(winner_id)
-            if not winner:
-                raise ValueError("Игрок с таким ID не найден в этой игре.")
-        else:
-            winner = game.players[0]
+        winner = game.player_for_id(winner_id)
+        if not winner:
+            raise ValueError("Игрок с таким ID не найден в этой игре.")
 
         # Устанавливаем победителя и отправляем сообщение
         game.winner = winner

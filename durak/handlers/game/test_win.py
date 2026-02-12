@@ -1,39 +1,26 @@
-'''
-Этот модуль содержит хендлер для тестовой команды /test_win,
-которая позволяет администратору мгновенно завершить игру, объявив победителя.
-'''
-
-from aiogram import Router, types
-from aiogram.filters import Command
-
-from durak.logic.game_manager import get_game_from_context, game_manager
-
-router = Router()
+from aiogram import types
+from loader import dp, gm
+from durak.objects.errors import NoGameInChatError
 
 
-@router.message(Command("test_win"))
-async def test_win_handler(message: types.Message):
-    '''
-    Обработчик команды /test_win.
-    Завершает игру и объявляет победителя.
-    Использование: /test_win [player_id]
-    Если player_id не указан, победителем становится первый игрок.
-    '''
-    game = get_game_from_context(message.chat.id)
-    if not game:
-        await message.answer("Игра не найдена в этом чате.")
-        return
-
-    # TODO: Добавить проверку на администратора
-
+@dp.message_handler(commands=["test_win"], is_admin=True)
+async def test_win(message: types.Message):
+    """
+    Handler for /test_win command to instantly end the game with a winner.
+    Available only for admins.
+    """
     try:
-        args = message.text.split()
-        winner_id = int(args[1]) if len(args) > 1 else None
+        game = gm.get_game_from_chat(message.chat)
+    except NoGameInChatError:
+        return await message.reply("Игра в этом чате не найдена.")
 
-        # Вызываем новый метод в game_manager
-        await game_manager.test_win(game, winner_id)
+    # The message should be a reply to the winner's message
+    if not message.reply_to_message:
+        return await message.reply("Эта команда должна быть вызвана в ответ на сообщение игрока, которого вы хотите объявить победителем.")
 
-    except (ValueError, IndexError):
-        await message.answer("Неверный формат команды. Используйте: /test_win [player_id]")
-    except Exception as e:
-        await message.answer(f"Произошла ошибка: {e}")
+    winner_id = message.reply_to_message.from_user.id
+    
+    try:
+        await gm.test_win_game(game, winner_id)
+    except ValueError as e:
+        await message.reply(str(e))
