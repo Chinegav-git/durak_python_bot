@@ -11,6 +11,7 @@ dp = Dispatcher(bot)
 
 # 3. GameManager
 gm = GameManager()
+gm.set_bot(bot)  # Передаем экземпляр бота в GameManager
 #Commands = COMMANDS
 
 # Database init
