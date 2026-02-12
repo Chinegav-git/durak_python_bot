@@ -43,7 +43,7 @@ def add_draw(player: Player, results: List[InlineQueryResult]):
 
     results.append(
         Sticker(
-            id="draw", sticker_file_id=c.STICKERS['draw'],
+            id="draw", sticker_file_id=c.SPECIAL['draw'],
             input_message_content=
             # InputTextMessageContent(f'Взял(а) {n} 🃏')
             InputTextMessageContent(f"🎴 {player.user.get_mention(as_html=True)} взяв(а) карти!")
@@ -57,7 +57,7 @@ def add_gameinfo(game: Game, results: List[InlineQueryResult]):
     results.append(
         Sticker(
             id="gameinfo",
-            sticker_file_id=c.STICKERS['info'],
+            sticker_file_id=c.SPECIAL['info'],
             input_message_content=game_info(game)
         )
     )
@@ -67,7 +67,7 @@ def add_pass(results: List[InlineQueryResult], game: Game):
     """Add option to pass"""
     results.append(
         Sticker(
-            id="pass", sticker_file_id=c.STICKERS['pass'],
+            id="pass", sticker_file_id=c.SPECIAL['pass'],
             input_message_content=InputTextMessageContent(
                 '✅ Пас'
             )
@@ -75,18 +75,20 @@ def add_pass(results: List[InlineQueryResult], game: Game):
     )
 
 
-
 def add_card(game: Game, atk_card: Card, results: List[InlineQueryResult], can_play: bool, def_card: Card = None, player: Player = None):
     """Add an option that represents a card"""
+    card_to_show = def_card or atk_card
+    is_trump = card_to_show.suit == game.trump
 
     if can_play:
-        id = repr(atk_card)
+        style = 'trump_normal' if is_trump else 'normal'
+        id_ = repr(atk_card)
 
         if def_card:
-            id += f'-{repr(def_card)}'
+            id_ += f'-{repr(def_card)}'
 
             results.append(
-                Sticker(id=id, sticker_file_id=c.STICKERS['normal'][repr(def_card)],
+                Sticker(id=id_, sticker_file_id=c.CARDS[style][repr(def_card)],
                     input_message_content=InputTextMessageContent(
                         f"🛡️ Побито карту {str(atk_card)} картою {str(def_card)}"
                     )
@@ -96,9 +98,9 @@ def add_card(game: Game, atk_card: Card, results: List[InlineQueryResult], can_p
         else:
             # For attack cards that can be played, add defense button
             if not def_card:  # Only for attack cards, not defense cards
-                beat = [[InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(atk_card)}')]]
+                # beat = [[InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(atk_card)}')]]
                 results.append(
-                        Sticker(id=id, sticker_file_id=c.STICKERS['normal'][repr(atk_card)],
+                        Sticker(id=id_, sticker_file_id=c.CARDS[style][repr(atk_card)],
                             input_message_content=InputTextMessageContent(
                                 f"⚔️ Підкинуто карту: {str(atk_card)}"
                             )
@@ -107,7 +109,7 @@ def add_card(game: Game, atk_card: Card, results: List[InlineQueryResult], can_p
             else:
                 # Defense cards don't need buttons
                 results.append(
-                    Sticker(id=id, sticker_file_id=c.STICKERS['normal'][repr(def_card)],
+                    Sticker(id=id_, sticker_file_id=c.CARDS[style][repr(def_card)],
                         input_message_content=InputTextMessageContent(
                             f"🛡️ Побито карту {str(atk_card)} картою {str(def_card)}"
                         )
@@ -115,8 +117,9 @@ def add_card(game: Game, atk_card: Card, results: List[InlineQueryResult], can_p
                 )
     
     else:
+        style = 'trump_grey' if is_trump else 'grey'
         results.append(
-            Sticker(id=str(uuid4()), sticker_file_id=c.STICKERS['grey'][repr(def_card or atk_card)],
+            Sticker(id=str(uuid4()), sticker_file_id=c.CARDS[style][repr(card_to_show)],
                     input_message_content=game_info(game))
         )
 
