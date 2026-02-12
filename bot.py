@@ -3,9 +3,12 @@ from aiogram import types, executor
 from loader import gm, bot, dp, Config, COMMANDS
 from durak.handlers import empty
 from durak.logic import game_manager # Импортируем game_manager
+from durak.filters import IsAdminFilter
 
 logging.basicConfig(level=logging.INFO)
 
+# Register custom filters
+dp.filters_factory.bind(IsAdminFilter)
 
 async def on_startup(*args):
     print("bot started!")
