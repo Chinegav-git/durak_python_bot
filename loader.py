@@ -1,5 +1,5 @@
 from aiogram import Bot, Dispatcher, types
-from config import Config
+from config import Config, Commands
 from durak.logic.game_manager import GameManager
 from durak.db.database import db
 
@@ -11,6 +11,7 @@ dp = Dispatcher(bot)
 
 # 3. GameManager
 gm = GameManager()
+#Commands = COMMANDS
 
 # Database init
 db.bind('sqlite', 'durak.sqlite', create_db=True)

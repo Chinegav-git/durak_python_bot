@@ -14,12 +14,25 @@ async def test_win(message: types.Message):
     except NoGameInChatError:
         return await message.reply("Игра в этом чате не найдена.")
 
-    # The message should be a reply to the winner's message
-    if not message.reply_to_message:
-        return await message.reply("Эта команда должна быть вызвана в ответ на сообщение игрока, которого вы хотите объявить победителем.")
+    args = message.get_args()
+    winner_id = None
 
-    winner_id = message.reply_to_message.from_user.id
-    
+    if message.reply_to_message:
+        winner_id = message.reply_to_message.from_user.id
+    elif args:
+        try:
+            winner_id = int(args)
+        except ValueError:
+            return await message.reply("Неверный ID пользователя. ID должен быть числом.")
+    else:
+        return await message.reply(
+            "Эта команда должна быть вызвана в ответ на сообщение игрока или с указанием ID игрока, "
+            "которого вы хотите объявить победителем."
+        )
+
+    if not game.player_for_id(winner_id):
+        return await message.reply("Игрок с таким ID не найден в этой игре.")
+        
     try:
         await gm.test_win_game(game, winner_id)
     except ValueError as e:
