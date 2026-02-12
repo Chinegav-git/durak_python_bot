@@ -37,6 +37,12 @@ class Game:
         self.MAX_PLAYERS: int = Config.MAX_PLAYERS
         self.logger = logging.getLogger(__name__)
 
+    def player_for_id(self, user_id: int) -> Optional[Player]:
+        """Returns player for user_id"""
+        for player in self.players:
+            if player.user.id == user_id:
+                return player
+        return None
 
     def start(self):
         self.deck._fill_cards()
