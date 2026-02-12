@@ -1,27 +1,20 @@
 import logging
-from aiogram import types, executor
-from loader import gm, bot, dp, Config, COMMANDS
-from durak.handlers import empty
-from durak.logic import game_manager # Импортируем game_manager
+from aiogram import Bot, Dispatcher, executor
+from config import Config
 from durak.filters import IsAdminFilter
 
+# 1. Настройка логов
 logging.basicConfig(level=logging.INFO)
 
-# Register custom filters
+# 2. Инициализация
+bot = Bot(token=Config.BOT_TOKEN)
+dp = Dispatcher(bot)
+
+# 3. РЕГИСТРАЦИЯ ФИЛЬТРА (Обязательно до импорта хендлеров!)
 dp.filters_factory.bind(IsAdminFilter)
 
-async def on_startup(*args):
-    print("bot started!")
+# 4. ИМПОРТ ХЕНДЛЕРОВ (После регистрации фильтров)
+from durak import handlers
 
-    # Устанавливаем объект bot в game_manager
-    gm.set_bot(bot)
-    
-    commands = []
-    for cmd, d in COMMANDS:
-        commands.append(types.BotCommand(cmd, d))
-    
-    await bot.set_my_commands(commands)
-
-
-if __name__ == "__main__":
-    executor.start_polling(dp, on_startup=on_startup, skip_updates=True)
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)
