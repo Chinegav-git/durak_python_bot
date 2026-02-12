@@ -27,6 +27,7 @@ class Game:
 
         self.attacker_index: int = 0
         self.winner: Player | None = None
+        self.winners: List[Player] = []
         self.is_pass: bool = False  # Atack player is PASS
         self.is_final: bool = False
 

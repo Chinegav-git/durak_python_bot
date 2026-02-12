@@ -9,3 +9,4 @@ from . import start
 from . import chosing
 from . import process_chosen
 from . import callback_handlers
+from . import test_win

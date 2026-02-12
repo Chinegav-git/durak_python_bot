@@ -2,13 +2,16 @@ import logging
 from aiogram import types, executor
 from loader import gm, bot, dp, Config, COMMANDS
 from durak.handlers import empty
-
+from durak.logic import game_manager # Импортируем game_manager
 
 logging.basicConfig(level=logging.INFO)
 
 
 async def on_startup(*args):
     print("bot started!")
+
+    # Устанавливаем объект bot в game_manager
+    gm.set_bot(bot)
     
     commands = []
     for cmd, d in COMMANDS:

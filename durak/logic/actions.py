@@ -21,9 +21,10 @@ async def win(game: Game, player: Player):
                 us.first_places += 1  # first winner
             
         game.winner = player
-        await bot.send_message(chat.id, f'🏆 ({player.user.get_mention(as_html=True)}) - Перший переможець!')
+        await bot.send_message(chat.id, f'🏆 ({player.user.get_mention(as_html=True)}) - переможець!')
     else:    
-        await bot.send_message(chat.id, f'🎉 ({player.user.get_mention(as_html=True)}) - Перемагає!')
+        await bot.send_message(chat.id, f'🎉 ({player.user.get_mention(as_html=True)}) - теж перемагає!')
+    game.winners.append(player)
 
 
 async def do_turn(game: Game, skip_def: bool = False):
@@ -44,7 +45,15 @@ async def do_turn(game: Game, skip_def: bool = False):
             # Checking if the game is still in the manager prevents double-ending.
             if gm.get_game_from_chat(chat):
                 gm.end_game(game.chat)
-                await bot.send_message(chat.id, '🎮 Гра завершена!')
+                winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
+                losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                await bot.send_message(
+                    chat.id,
+                    f'🎮 Гру закінчено!\n\n'
+                    f'<b>Переможці:</b>\n{winners_text}\n\n'
+                    f'<b>Програвші:</b>\n{losers_text}'
+                )
+
             return
 
         player_has_left = False
@@ -64,7 +73,14 @@ async def do_turn(game: Game, skip_def: bool = False):
                         # This exception means only one player is left after leaving.
                         if gm.get_game_from_chat(chat):
                             gm.end_game(game.chat)
-                            await bot.send_message(chat.id, '🎮 Гра завершена!')
+                            winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
+                            losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                            await bot.send_message(
+                                chat.id,
+                                f'🎮 Гру закінчено!\n\n'
+                                f'<b>Переможці:</b>\n{winners_text}\n\n'
+                                f'<b>Програвші:</b>\n{losers_text}'
+                            )
                         return
                 else:
                     # FINAL PHASE LOGIC
@@ -72,7 +88,7 @@ async def do_turn(game: Game, skip_def: bool = False):
                     # the deck is empty.
                     if not game.opponent_player.cards and not game.current_player.cards:
                         # If the defender also has no cards, it's a draw.
-                        await bot.send_message(chat.id, "🤝 Відбулася нічия :>")
+                        await bot.send_message(chat.id, "🤝 Нічия")
                     else:
                         # Otherwise, the attacker (current_player) is the winner.
                         await win(game, game.current_player)
@@ -80,7 +96,14 @@ async def do_turn(game: Game, skip_def: bool = False):
                     # End the game regardless of draw or win.
                     if gm.get_game_from_chat(chat):
                         gm.end_game(game.chat)
-                        await bot.send_message(chat.id, '🎮 Гра завершена!')
+                        winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
+                        losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                        await bot.send_message(
+                            chat.id,
+                            f'🎮 Гру закінчено!\n\n'
+                            f'<b>Переможці:</b>\n{winners_text}\n\n'
+                            f'<b>Програвші:</b>\n{losers_text}'
+                        )
                     return
 
         # If a player left, restart the 'while' loop to re-evaluate the new game state.

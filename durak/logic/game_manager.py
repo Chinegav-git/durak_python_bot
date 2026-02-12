@@ -1,3 +1,4 @@
+
 from ..objects import *
 from ..db import UserSetting, session
 
@@ -9,7 +10,10 @@ class GameManager:
     def __init__(self) -> None:
         self.games: Dict[int, Game] = dict()
         self.notify: Dict[int, List[int]] = list()
+        self.bot: Bot = None
 
+    def set_bot(self, bot: Bot):
+        self.bot = bot
     
     def new_game(self, chat: types.Chat, creator: types.User) -> Game:
         """
@@ -65,14 +69,29 @@ class GameManager:
             del self.games[chat.id]
             return
         raise NoGameInChatError
-
-        # else:
-        #     for chat_id, game_ in self.games.items():
-        #         if target == game_:
-        #             del self.games[chat_id]
-        #             return
-        #     raise NoGameInChatError
         
+    async def test_win(self, game: Game, winner_id: int = None):
+        '''
+        Завершает игру и объявляет победителя для теста.
+        '''
+        if not self.bot:
+            # На случай, если bot не был установлен. 
+            # Этого не должно произойти при правильном запуске.
+            return
+
+        if winner_id:
+            winner = game.player_for_id(winner_id)
+            if not winner:
+                raise ValueError("Игрок с таким ID не найден в этой игре.")
+        else:
+            winner = game.players[0]
+
+        # Устанавливаем победителя и отправляем сообщение
+        game.winner = winner
+        await self.bot.send_message(game.chat.id, f"По команде администратора, игра завершена. Победитель: {winner.user.full_name}")
+
+        # Завершаем игру
+        self.end_game(game)
 
     def join_in_game(self, game: Game, user: types.User) -> None:
         """
