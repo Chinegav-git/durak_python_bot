@@ -1,6 +1,7 @@
 
 from ..objects import *
-from ..db import UserSetting, session
+from ..db import UserSetting
+from pony.orm import db_session
 
 from aiogram import types, Bot
 from typing import Dict, List, Union
@@ -40,7 +41,7 @@ class GameManager:
             return game
         raise NoGameInChatError
     
-
+    @db_session
     def end_game(self, target: Union[types.Chat, Game]) -> None:
         """errors:
 
@@ -57,14 +58,13 @@ class GameManager:
             
             for pl in players:
                 # stats
-                with session as s:
-                    user = pl.user
-                    us = UserSetting.get(id=user.id)
-                    if not us:
-                        us = UserSetting(id=user.id)
+                user = pl.user
+                us = UserSetting.get(id=user.id)
+                if not us:
+                    us = UserSetting(id=user.id)
 
-                    if us.stats:
-                        us.games_played += 1
+                if us.stats:
+                    us.games_played += 1
             
             del self.games[chat.id]
             return
@@ -87,8 +87,8 @@ class GameManager:
         game.winner = winner
         await self.bot.send_message(game.chat.id, f"По команде администратора, игра завершена. Победитель: {winner.user.full_name}")
 
-        # Завершаем игру
-        self.end_game(game)
+        # Завершаем игру (ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ДИАГНОСТИКИ)
+        # self.end_game(game)
 
     def join_in_game(self, game: Game, user: types.User) -> None:
         """
