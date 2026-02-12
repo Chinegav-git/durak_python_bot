@@ -1,4 +1,4 @@
-
+import asyncio
 from ..objects import *
 from ..db import UserSetting
 from pony.orm import db_session
@@ -71,24 +71,35 @@ class GameManager:
         raise NoGameInChatError
         
     async def test_win_game(self, game: Game, winner_id: int):
-        '''
+        """
         Завершает игру и объявляет победителя для теста.
-        '''
+        """
         if not self.bot:
-            # На случай, если bot не был установлен. 
-            # Этого не должно произойти при правильном запуске.
             return
 
         winner = game.player_for_id(winner_id)
         if not winner:
             raise ValueError("Игрок с таким ID не найден в этой игре.")
 
-        # Устанавливаем победителя и отправляем сообщение
+        # 1. Correctly stop the game
+        game.started = False
         game.winner = winner
-        await self.bot.send_message(game.chat.id, f"По команде администратора, игра завершена. Победитель: {winner.user.full_name}")
 
-        # Завершаем игру (ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ДИАГНОСТИКИ)
-        # self.end_game(game)
+        # 2. Build the detailed message
+        losers = [p for p in game.players if p.user.id != winner_id]
+        
+        message = "По команде администратора, игра принудительно завершена!\n\n"
+        message += f"🏆 Победитель:\n- {winner.user.full_name}\n\n"
+        
+        if losers:
+            message += "Проигравшие:\n"
+            for loser in losers:
+                message += f"- {loser.user.full_name}\n"
+
+        await self.bot.send_message(game.chat.id, message)
+
+        # 3. Clean up the game session in a separate thread
+        await asyncio.to_thread(self.end_game, game)
 
     def join_in_game(self, game: Game, user: types.User) -> None:
         """
