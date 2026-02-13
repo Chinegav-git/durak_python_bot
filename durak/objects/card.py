@@ -118,28 +118,33 @@ class Card:
         self.suit: Suits = suit if isinstance(suit, Suits) else Suits(str(suit))
 
     def __str__(self) -> str:
-        value = self.value
-        if value == Values.JACK:
-            value = 'J'
-        elif value == Values.QUEEN:
-            value = 'Q'
-        elif value == Values.KING:
-            value = 'K'
-        elif value == Values.ACE:
-            value = 'A'
+        # Mapping for face cards
+        value_map = {
+            Values.JACK: 'J',
+            Values.QUEEN: 'Q',
+            Values.KING: 'K',
+            Values.ACE: 'A'
+        }
+        # Use the mapped letter if it's a face card, otherwise use its own value (e.g., '6', '7')
+        value_str = value_map.get(self.value, self.value.value)
 
-        suit = self.suit 
-        value_to_key = {member.value: member.name for member in Suits}
-        suit = SuitsIcons.__members__.get(value_to_key.get(suit))
+        # Mapping for suit icons
+        suit_map = {
+            Suits.DIAMOND: SuitsIcons.DIAMOND,
+            Suits.HEART: SuitsIcons.HEART,
+            Suits.CLUB: SuitsIcons.CLUB,
+            Suits.SPADE: SuitsIcons.SPADE
+        }
+        suit_str = suit_map.get(self.suit, '?')
 
-        return f'{value} {suit}'
-    
+        return f'{value_str} {suit_str}'
+
     def __repr__(self) -> str:
         return f"{self.value}_{self.suit}"
-    
+
     def __eq__(self, other) -> bool:
         return repr(self) == repr(other)
-    
+
     def __lt__(self, other) -> bool:
         if not isinstance(other, Card):
             raise ValueError(f"{other} is not card. Cannot sorting.")
@@ -147,13 +152,13 @@ class Card:
         suit_order = {'d': 0, 'h': 1, 'c': 2, 's': 3}
         self_suit_idx = suit_order.get(self.suit, 4)
         other_suit_idx = suit_order.get(other.suit, 4)
-        
+
         if self_suit_idx != other_suit_idx:
             return self_suit_idx < other_suit_idx
-        
+
         # Within same suit, sort by value (numeric)
         return int(self.value) < int(other.value)
-    
+
     def __hash__(self) -> int:
         return hash(self.__repr__())
 

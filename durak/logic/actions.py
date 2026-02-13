@@ -169,10 +169,19 @@ async def do_pass(player: Player):
     bot = Bot.get_current()
     
     game.is_pass = True
-    await bot.send_message(
+    msg = await bot.send_message(
         game.chat.id,
         f"Пас! {player.user.get_mention(as_html=True)} більше не підкидає."
     )
+
+    async def _delete_later(chat_id: int, message_id: int):
+        await asyncio.sleep(5)
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except Exception:
+            pass
+
+    asyncio.create_task(_delete_later(msg.chat.id, msg.message_id))
 
     # Якщо всі карти вже побиті, коли гравець пасує, передаємо хід
     if game.all_beaten_cards:
@@ -213,7 +222,7 @@ async def do_attack_card(player: Player, card: Card):
         beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
         msg = await bot.send_message(
             game.chat.id,
-            f"⚔️ <b>{user.get_mention(as_html=True)}</b> підкинув(ла) карту: {str(card)}",
+            f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}",
             reply_markup=types.InlineKeyboardMarkup(inline_keyboard=beat),
         )
         game.attack_announce_message_ids[card] = msg.message_id
