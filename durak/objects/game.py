@@ -15,6 +15,7 @@ class Game:
     """ This is Game """
 
     def __init__(self, chat: types.Chat, creator: types.User) -> None:
+        self.id = chat.id  # Use chat.id as the unique game ID
         self.chat: types.Chat = chat
         self.deck: Deck = Deck()
         self.field: Dict[Card, Optional[Card]] = dict()
