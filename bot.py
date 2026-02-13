@@ -5,16 +5,14 @@ from durak.filters import IsAdminFilter
 
 logging.basicConfig(level=logging.INFO)
 
-# Спочатку реєструємо всі кастомні фільтри
+# Реєструємо кастомний фільтр
 dp.filters_factory.bind(IsAdminFilter)
 
-# А вже потім імпортуємо обробники, які їх використовують
-from durak.handlers import game, info, gamemode_router
+# Імпортуємо обробники
+# Важливо, щоб ці модулі були імпортовані, 
+# оскільки в них знаходяться декоратори @dp.message_handler і т.д.
+from durak.handlers import game, info, game_mode
 
-# Реєстрація роутерів
-dp.include(game.router)
-dp.include(info.router)
-dp.include(gamemode_router)
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
