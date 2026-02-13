@@ -1,6 +1,6 @@
 import asyncio
 from ..objects import *
-from ..db import UserSetting
+from ..db import UserSetting, ChatSetting
 from pony.orm import db_session
 
 from aiogram import types, Bot
@@ -16,17 +16,33 @@ class GameManager:
     def set_bot(self, bot: Bot):
         self.bot = bot
     
+    @db_session
     def new_game(self, chat: types.Chat, creator: types.User) -> Game:
         """
         errors:
 
         - GameAlreadyInChatError
         """
+        # Check for game in memory
         if self.games.get(chat.id, None) is not None:
             raise GameAlreadyInChatError
-        
+
+        # Check for game in DB (robust check after restart)
+        chat_setting = ChatSetting.get(id=chat.id)
+        if chat_setting and chat_setting.display_mode == "game_active":
+            # Game exists in DB but not in memory, means bot restarted.
+            # We reset the state to allow a new game.
+            chat_setting.display_mode = 'text' 
+
+        # Create new game
         game = Game(chat, creator)
         self.games[chat.id] = game
+        
+        # Mark game as active in DB
+        if not chat_setting:
+            chat_setting = ChatSetting(id=chat.id)
+        chat_setting.display_mode = "game_active"
+
         return game
     
 
@@ -67,8 +83,14 @@ class GameManager:
                     us.games_played += 1
             
             del self.games[chat.id]
-            return
-        raise NoGameInChatError
+
+        # Always reset the DB state
+        chat_setting = ChatSetting.get(id=chat.id)
+        if chat_setting:
+            chat_setting.display_mode = 'text'
+
+        if game is None:
+            raise NoGameInChatError
         
     async def test_win_game(self, game: Game, winner_id: int):
         """
