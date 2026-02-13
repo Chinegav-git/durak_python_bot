@@ -140,10 +140,12 @@ class Card:
         return f'{value_str} {suit_str}'
 
     def __repr__(self) -> str:
-        return f"{self.value}_{self.suit}"
+        return f"{self.value.value}_{self.suit.value}"
 
     def __eq__(self, other) -> bool:
-        return repr(self) == repr(other)
+        if not isinstance(other, Card):
+            return NotImplemented
+        return self.value == other.value and self.suit == other.suit
 
     def __lt__(self, other) -> bool:
         if not isinstance(other, Card):
@@ -160,7 +162,7 @@ class Card:
         return int(self.value) < int(other.value)
 
     def __hash__(self) -> int:
-        return hash(self.__repr__())
+        return hash((self.value, self.suit))
 
 def from_str(string: str):
     # Accept formats like '6_d', '10_h', 'j_s', 'A♠', 'a_s' etc.

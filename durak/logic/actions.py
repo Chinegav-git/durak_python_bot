@@ -95,19 +95,6 @@ async def do_turn(game: Game, skip_def: bool = False):
 
     game.turn(skip_def=skip_def)
     
-    bot = Bot.get_current()
-    player = game.current_player
-
-    keyboard = types.InlineKeyboardMarkup()
-    button = types.InlineKeyboardButton(text="🃏 Атакувати", switch_inline_query_current_chat='')
-    keyboard.add(button)
-
-    await bot.send_message(
-        game.chat.id,
-        f"⚔️ Хід гравця {player.user.get_mention(as_html=True)}!",
-        reply_markup=keyboard
-    )
-
 
 async def do_leave_player(player: Player, from_turn: bool = False):
     game = player.game

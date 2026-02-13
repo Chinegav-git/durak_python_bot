@@ -7,10 +7,8 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 @dp.message_handler(commands=[Commands.NEW], chat_type=['group', 'supergroup'])
 async def new_handler(message: types.Message):
     ''' Creating new game '''
-    import logging
-    logging.info("New game created")
-    user = types.User.get_current()
-    chat = types.Chat.get_current()
+    user = message.from_user
+    chat = message.chat
 
     try:
         # create
@@ -20,8 +18,9 @@ async def new_handler(message: types.Message):
         return
     
     # Create inline keyboards for join and start
-    join_button = InlineKeyboardButton(text='👋 Приєднатися', callback_data=f'join_game_{user.id}')
-    start_button = InlineKeyboardButton(text='🚀 Почати гру', callback_data=f'start_game_{user.id}')
+    # The user_id in callback_data is used to identify who can start the game
+    join_button = InlineKeyboardButton(text='👋 Приєднатися', callback_data=f'join_game_{game.id}')
+    start_button = InlineKeyboardButton(text='🚀 Почати гру', callback_data=f'start_game_{game.id}')
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[join_button], [start_button]])
     

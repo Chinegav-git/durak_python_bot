@@ -117,15 +117,15 @@ class Game:
         if not self.allow_atack:
             return False
 
-        # 3. Attacker must have a card with a rank that is already on the field
-        field_ranks = {c.rank for c in self.attacking_cards}
-        field_ranks.update({c.rank for c in self.defending_cards if c})
+        # 3. Attacker must have a card with a value that is already on the field
+        field_values = {c.value for c in self.attacking_cards}
+        field_values.update({c.value for c in self.defending_cards if c})
 
-        if not field_ranks:
+        if not field_values:
             return True # Can start an attack (shouldn't be reached in this context)
 
         for card in attacker.cards:
-            if card.rank in field_ranks:
+            if card.value in field_values:
                 return True # Found a valid card to throw in
 
         return False
