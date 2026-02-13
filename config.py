@@ -40,15 +40,15 @@ class Commands:
     
 
 COMMANDS: List[Tuple[str, str]] = [
-    (Commands.NEW, 'Создать новую игру'),
-    (Commands.JOIN, 'Присоедениться к игре'),
-    (Commands.START, 'Запустить игру'),
-    (Commands.LEAVE, 'Покинуть игру или лобби'),
-    (Commands.GLEAVE, 'Покинуть игру во всех чатах'),
-    (Commands.KICK, 'Выгнать игрока'),
-    (Commands.KILL, 'Завершить игру'),
-    (Commands.HELP, 'Помощь по боту'),
+    (Commands.NEW, 'Створити нову гру'),
+    (Commands.JOIN, 'Приєднатися до гри'),
+    (Commands.START, 'Запустити гру'),
+    (Commands.LEAVE, 'Покинути гру або лобі'),
+    (Commands.GLEAVE, 'Покинути гру у всіх чатах'),
+    (Commands.KICK, 'Вигнати гравця'),
+    (Commands.KILL, 'Завершити гру'),
+    (Commands.HELP, 'Допомога по боту'),
     (Commands.STATS, 'Ваша статистика'),
-    (Commands.OFF_STATS, 'Выключить статистику'),
-    (Commands.ON_STATS, 'Включить статистику')
+    (Commands.OFF_STATS, 'Вимкнути статистику'),
+    (Commands.ON_STATS, 'Увімкнути статистику')
 ]

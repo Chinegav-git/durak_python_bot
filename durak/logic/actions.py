@@ -166,8 +166,15 @@ async def do_leave_player(player: Player, from_turn: bool = False):
 
 async def do_pass(player: Player):
     game = player.game
+    bot = Bot.get_current()
+    
     game.is_pass = True
+    await bot.send_message(
+        game.chat.id,
+        f"Пас! {player.user.get_mention(as_html=True)} більше не підкидає."
+    )
 
+    # Якщо всі карти вже побиті, коли гравець пасує, передаємо хід
     if game.all_beaten_cards:
         await do_turn(game)
 
@@ -231,9 +238,9 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
             us.cards_played += 1
             us.cards_beaten += 1
     
-    if game.all_beaten_cards:
-        if game.is_pass:
-            await do_turn(game)
+    # Ключова зміна: перевіряємо пас ТІЛЬКИ ПІСЛЯ того, як всі карти побиті
+    if game.all_beaten_cards and game.is_pass:
+        await do_turn(game)
 
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)
     if announce_id:

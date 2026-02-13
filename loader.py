@@ -19,4 +19,4 @@ db.bind('sqlite', 'durak.sqlite', create_db=True)
 db.generate_mapping(create_tables=True)
 
 # Button
-CHOISE = [[types.InlineKeyboardButton(text='Выбери карту!', switch_inline_query_current_chat='')]]
+CHOISE = [[types.InlineKeyboardButton(text='Вибери карту!', switch_inline_query_current_chat='')]]

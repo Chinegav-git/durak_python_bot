@@ -27,7 +27,7 @@ async def new_handler(message: types.Message):
     
     await message.answer(
         f'🎮 Гру створено!\n'
-        f'👤 Створець: {user.get_mention(as_html=True)}\n\n'
+        f'👤 Засновник: {user.get_mention(as_html=True)}\n\n'
         f'Використовуйте кнопки нижче для керування грою:',
         reply_markup=keyboard
     )

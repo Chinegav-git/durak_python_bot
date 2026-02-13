@@ -1,116 +1,132 @@
+from contextlib import suppress
 from aiogram import types
-from aiogram.types import CallbackQuery
-from loader import bot, dp, gm, Config, Commands, CHOISE
+from aiogram.utils.exceptions import MessageNotModified, CantParseEntities
+from loader import bot, dp, gm, Commands
 from durak.objects import *
-import durak.logic.actions as a
 
 
-@dp.callback_query_handler(lambda call: call.data and call.data.startswith('join_game_'))
-async def join_callback_handler(call: CallbackQuery):
-    """ Handle join button callback """
+@dp.callback_query_handler(lambda c: c.data and c.data == 'close')
+async def process_callback_close(callback_query: types.CallbackQuery):
+    with suppress(MessageNotModified):
+        await bot.edit_message_text(
+            inline_message_id=callback_query.inline_message_id,
+            text='Лобі закрито.'
+        )
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('kick'))
+async def process_callback_kick(callback_query: types.CallbackQuery):
+    """ Kicking a player from a lobby """
+    user_id = int(callback_query.data.split('|')[1])
     user = types.User.get_current()
-    chat = call.message.chat
-    
+    chat = types.Chat.get_current()
+
     try:
         game = gm.get_game_from_chat(chat)
-    except NoGameInChatError:
-        await call.answer('🚫 У цьому чаті немає гри!', show_alert=True)
+    except NoGameInChatError: # FIX
+        with suppress(MessageNotModified):
+            await bot.edit_message_text(
+                inline_message_id=callback_query.inline_message_id,
+                text=f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}'
+            )
         return
-    
-    # Extract creator ID from callback data
-    creator_id = int(call.data.split('_')[2])
-    
-    # Verify the game creator matches
-    if game.creator.id != creator_id:
-        await call.answer('🚫 Ця гра не належить вам!', show_alert=True)
+
+    if user.id != game.creator.id:
+        await bot.answer_callback_query(callback_query.id, 'Натискати може тільки творець гри!')
         return
     
     try:
-        # add user in a game
-        gm.join_in_game(game, user)
-        await call.answer('👋 Ви приєдналися до гри!', show_alert=True)
-        
-        # Update the message to show current players
-        players_list = '\n'.join([f'👤 {p.user.get_mention(as_html=True)}' for p in game.players])
+        gm.kick_player(game, user_id)
+    except PlayerNotFoundError:
+        await bot.answer_callback_query(callback_query.id, 'Гравець не знайдений!')
+        return
+
+    players_list = '\n'.join([
+        f'{i+1}. {player.user.get_mention(as_html=True)}'
+        for i, player in enumerate(game.players)
+    ])
+    with suppress(MessageNotModified, CantParseEntities):
         await bot.edit_message_text(
-            chat_id=chat.id,
-            message_id=call.message.message_id,
-            text=f'🎮 Гру створено!\n'
-                 f'👤 Створювач: {game.creator.get_mention(as_html=True)}\n\n'
-                 f'👥 Гравці ({len(game.players)}/{Config.MAX_PLAYERS}):\n{players_list}\n\n'
-                 f'Використовуйте кнопки нижче для керування грою:',
-            reply_markup=call.message.reply_markup
+            inline_message_id=callback_query.inline_message_id,
+            text=f'<b>Гравці:</b>\n{players_list}'
         )
-        
-    except GameStartedError:
-        await call.answer('🎮 Гра вже запущена! 🚫 Ви не можете приєднатися!', show_alert=True)
-    except LobbyClosedError:
-        await call.answer('🚫 Лобі закрито!\n🔓 Відкрити - /open', show_alert=True)
-    except LimitPlayersInGameError:
-        await call.answer(f'🚫 Досягнуто ліміт у {Config.MAX_PLAYERS} гравців!', show_alert=True)
-    except AlreadyJoinedInGlobalError:
-        await call.answer(f'🚫 Схоже ви граєте в іншому чаті!\n👋 Покинути цю гру - /{Commands.GLEAVE}', show_alert=True)
-    except AlreadyJoinedError:
-        await call.answer('🎮 Ви вже в грі!', show_alert=True)
 
 
-@dp.callback_query_handler(lambda call: call.data and call.data.startswith('start_game_'))
-async def start_callback_handler(call: CallbackQuery):
-    """ Handle start game button callback """
+@dp.inline_handler()
+async def inline_handler(inline_query: types.InlineQuery):
+    """ Main game handler """
     user = types.User.get_current()
-    chat = call.message.chat
     
     try:
-        game = gm.get_game_from_chat(chat)
+        player = gm.get_player_from_user(user)
+        game = player.game
     except NoGameInChatError:
-        await call.answer('🚫 У цьому чаті немає гри!', show_alert=True)
+        await bot.answer_inline_query(
+            inline_query.id,
+            [],
+            switch_pm_text='У вас немає активних ігор!',
+            switch_pm_parameter='start',
+            cache_time=0
+        )
+        return
+    except PlayerNotFoundError:
+        await bot.answer_inline_query(
+            inline_query.id,
+            [],
+            switch_pm_text=f'Ви не перебуваєте в грі! Приєднатися - /{Commands.JOIN}',
+            switch_pm_parameter='join',
+            cache_time=0
+        )
+        return
+    except AlreadyJoinedInGlobalError as e:
+        await bot.answer_inline_query(
+            inline_query.id,
+            [],
+            switch_pm_text=f'Ви граєте в іншому чаті! Покинути - /{Commands.GLEAVE}',
+            switch_pm_parameter='gleave',
+            cache_time=0
+        )
         return
     
-    # Extract creator ID from callback data
-    creator_id = int(call.data.split('_')[2])
-    
-    # Check if user is creator or admin
-    if game.creator.id != creator_id:
-        await call.answer('🚫 Тільки творець гри може запустити її!', show_alert=True)
+    # player and game
+    player = gm.get_player_from_user(user)
+    game = player.game
+    query = inline_query.query
+
+    if query == '?':
+        return await bot.answer_inline_query(
+            inline_query.id, [player.game_status_as_inline_article()], cache_time=0
+        )
+
+    if not game.started:
+        await bot.answer_inline_query(
+            inline_query.id,
+            [],
+            switch_pm_text="Гра ще не почалася!",
+            switch_pm_parameter='start',
+            cache_time=0
+        )
         return
-    
-    # Check if user has admin rights (optional enhancement)
-    from durak.logic.utils import user_is_creator_or_admin
-    if not (await user_is_creator_or_admin(user, game, chat)):
-        await call.answer('🚫 Ви не можете почати гру!', show_alert=True)
+
+    if game.current_player != player and game.opponent_player != player:
+        await bot.answer_inline_query(
+            inline_query.id, [player.game_status_as_inline_article()],
+            switch_pm_text="Зараз не ваша черга!",
+            switch_pm_parameter='start', cache_time=0
+        )
         return
-    
-    try:
-        # game start
-        gm.start_game(game)
-        await call.answer('🚀 Гра запущена!', show_alert=True)
-        
-        # Update the message to show game started
-        await bot.edit_message_text(
-            chat_id=chat.id,
-            message_id=call.message.message_id,
-            text=f'🎮 Гра запущена!\n\n'
-                 f'🎯 Козир - {game.deck.trump_ico}\n'
-                 f'👥 Гравці ({len(game.players)}):\n'
-                 + '\n'.join([f'👤 {p.user.get_mention(as_html=True)}' for p in game.players]),
-            reply_markup=None  # Remove buttons after game starts
+
+    # is current
+    if game.current_player == player:
+        await bot.answer_inline_query(
+            inline_query.id,
+            player.get_attack_as_inline_query(query),
+            cache_time=0
         )
-        
-        current = game.current_player
-        opponent = game.opponent_player
-        text = (
-            f'🎯 <b>Початок раунду</b>\n\n'
-            f'⚔️ <b>Атакує:</b> {current.user.get_mention(as_html=True)} 🃏 {len(current.cards)} карт\n'
-            f'🛡️ <b>Захищається:</b> {opponent.user.get_mention(as_html=True)} 🃏 {len(opponent.cards)} карт\n\n'
-            f'🎯 <b>Козир:</b> {game.deck.trump_ico}\n'
+    # is opponent
+    elif game.opponent_player == player:
+        await bot.answer_inline_query(
+            inline_query.id,
+            player.get_defence_as_inline_query(query),
+            cache_time=0
         )
-        await bot.send_message(
-            chat.id,
-            text,
-            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
-        )
-        
-    except GameStartedError:
-        await call.answer('🎮 Гра вже запущена!', show_alert=True)
-    except NotEnoughPlayersError:
-        await call.answer(f'🚫 Недостатньо гравців!\n🎮 Потрібно хоча б 2 гравці', show_alert=True)

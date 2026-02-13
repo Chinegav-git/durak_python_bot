@@ -72,14 +72,14 @@ class GameManager:
         
     async def test_win_game(self, game: Game, winner_id: int):
         """
-        Завершает игру и объявляет победителя для теста.
+        Завершує гру та оголошує переможця для тесту.
         """
         if not self.bot:
             return
 
         winner = game.player_for_id(winner_id)
         if not winner:
-            raise ValueError("Игрок с таким ID не найден в этой игре.")
+            raise ValueError("Гравця з таким ID не знайдено в цій грі.")
 
         # 1. Correctly stop the game
         game.started = False
@@ -88,11 +88,11 @@ class GameManager:
         # 2. Build the detailed message
         losers = [p for p in game.players if p.user.id != winner_id]
         
-        message = "По команде администратора, игра принудительно завершена!\n\n"
-        message += f"🏆 Победитель:\n- {winner.user.full_name}\n\n"
+        message = "За командою адміністратора, гру примусово завершено!\n\n"
+        message += f"🏆 Переможець:\n- {winner.user.full_name}\n\n"
         
         if losers:
-            message += "Проигравшие:\n"
+            message += "Програвші:\n"
             for loser in losers:
                 message += f"- {loser.user.full_name}\n"
 
