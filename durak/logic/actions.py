@@ -1,6 +1,6 @@
 from ..objects import *
 from loader import gm
-from ..db import UserSetting, session
+from ..db import UserSetting, session, ChatSetting
 from aiogram import types, Bot
 import asyncio
 
@@ -117,7 +117,7 @@ async def do_turn(game: Game, skip_def: bool = False):
     # If the game hasn't ended, proceed with the normal turn rotation.
     game.turn(skip_def=skip_def)
 
-    
+
 async def do_leave_player(player: Player, from_turn: bool = False):
     """errors:
 
@@ -190,6 +190,16 @@ async def do_pass(player: Player):
 
 async def do_draw(player: Player):
     game = player.game
+    bot = Bot.get_current()
+    chat_settings = ChatSetting.get_or_create(game.chat.id)
+
+    if chat_settings.display_mode in ['text_and_sticker', 'sticker_and_button']:
+        for sticker_message_id in game.attack_sticker_message_ids.values():
+            try:
+                await bot.delete_message(chat_id=game.chat.id, message_id=sticker_message_id)
+            except Exception:
+                pass
+
     game.take_all_field()
     await do_turn(game, True)
 
@@ -199,6 +209,7 @@ async def do_attack_card(player: Player, card: Card):
     game = player.game
     user = player.user
     bot = Bot.get_current()
+    chat_settings = ChatSetting.get_or_create(game.chat.id)
     
     # stats
     with session:
@@ -219,13 +230,37 @@ async def do_attack_card(player: Player, card: Card):
                 game.is_final = True
 
     try:
-        beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
-        msg = await bot.send_message(
-            game.chat.id,
-            f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}",
-            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=beat),
-        )
-        game.attack_announce_message_ids[card] = msg.message_id
+        if chat_settings.display_mode == 'text':
+            beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
+            msg = await bot.send_message(
+                game.chat.id,
+                f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}",
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=beat),
+            )
+            game.attack_announce_message_ids[card] = msg.message_id
+        elif chat_settings.display_mode == 'text_and_sticker':
+            sticker_msg = await bot.send_sticker(game.chat.id, card.sticker_id)
+            game.attack_sticker_message_ids[card] = sticker_msg.message_id
+
+            beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
+            msg = await bot.send_message(
+                game.chat.id,
+                f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}",
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=beat),
+            )
+            game.attack_announce_message_ids[card] = msg.message_id
+        elif chat_settings.display_mode == 'sticker_and_button':
+            sticker_msg = await bot.send_sticker(game.chat.id, card.sticker_id)
+            game.attack_sticker_message_ids[card] = sticker_msg.message_id
+
+            beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
+            msg = await bot.send_message(
+                game.chat.id,
+                "​",  # Zero-width space for an empty message
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=beat),
+            )
+            game.attack_announce_message_ids[card] = msg.message_id
+
     except Exception:
         # If the bot has no permission to post buttons / HTML etc., do not break the game flow.
         pass
@@ -236,6 +271,7 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     game = player.game
     user = player.user
     bot = Bot.get_current()
+    chat_settings = ChatSetting.get_or_create(game.chat.id)
     
     # stats
     with session:
@@ -247,25 +283,42 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
             us.cards_played += 1
             us.cards_beaten += 1
     
-    # Ключова зміна: перевіряємо пас ТІЛЬКИ ПІСЛЯ того, як всі карти побиті
+    # Handle turn end for 2-player games if the attacker cannot continue
+    if game.all_beaten_cards and len(game.players) == 2 and not game.attacker_can_continue:
+        await do_turn(game)
+        return # End here to avoid double turn
+
+    # Handle turn end when the attacker manually passes
     if game.all_beaten_cards and game.is_pass:
         await do_turn(game)
 
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)
-    if announce_id:
-        async def _delete_later(chat_id: int, message_id: int):
-            await asyncio.sleep(7)
+    
+    if chat_settings.display_mode in ['text_and_sticker', 'sticker_and_button']:
+        sticker_id = game.attack_sticker_message_ids.pop(atk_card, None)
+        if sticker_id:
+            # no need to use asyncio.create_task, because we want to delete it instantly
             try:
-                await bot.delete_message(chat_id=chat_id, message_id=message_id)
+                await bot.delete_message(chat_id=game.chat.id, message_id=sticker_id)
             except Exception:
                 pass
 
+    async def _delete_later(chat_id: int, message_id: int):
+        await asyncio.sleep(7)
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except Exception:
+            pass
+
+    if announce_id:
         asyncio.create_task(_delete_later(game.chat.id, announce_id))
 
     try:
+        toss_more = [[types.InlineKeyboardButton(text='↪️ Підкинути ще', switch_inline_query_current_chat='')]]
         await bot.send_message(
             game.chat.id,
             f"🛡️ <b>{user.get_mention(as_html=True)}</b> побив(ла) карту {str(atk_card)} картою {str(def_card)}",
+            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=toss_more),
         )
     except Exception:
         pass

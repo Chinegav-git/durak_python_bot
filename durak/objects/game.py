@@ -32,6 +32,7 @@ class Game:
         self.is_final: bool = False
 
         self.attack_announce_message_ids: Dict[Card, int] = {}
+        self.attack_sticker_message_ids: Dict[Card, int] = {}
 
         self.COUNT_CARDS_IN_START: int = Config.COUNT_CARDS_IN_START
         self.MAX_PLAYERS: int = Config.MAX_PLAYERS
@@ -102,7 +103,32 @@ class Game:
     def allow_atack(self) -> bool:
         return len(self.attacking_cards) < self.COUNT_CARDS_IN_START and \
             len(self.defending_cards)+len(self.opponent_player.cards) > len(self.attacking_cards)
-    
+
+    @property
+    def attacker_can_continue(self) -> bool:
+        """Checks if the attacking player can add more cards."""
+        attacker = self.current_player
+
+        # 1. Attacker must have cards
+        if not attacker.cards:
+            return False
+
+        # 2. Must be allowed to attack (respect card limits)
+        if not self.allow_atack:
+            return False
+
+        # 3. Attacker must have a card with a rank that is already on the field
+        field_ranks = {c.rank for c in self.attacking_cards}
+        field_ranks.update({c.rank for c in self.defending_cards if c})
+
+        if not field_ranks:
+            return True # Can start an attack (shouldn't be reached in this context)
+
+        for card in attacker.cards:
+            if card.rank in field_ranks:
+                return True # Found a valid card to throw in
+
+        return False
     
     def attack(self, card: Card) -> None:
         cur, opp = self.current_player, self.opponent_player
@@ -122,6 +148,7 @@ class Game:
             self.deck.dismiss(def_card)
         self.field = dict()
         self.attack_announce_message_ids.clear()
+        self.attack_sticker_message_ids.clear()
 
 
     def take_all_field(self)-> None:

@@ -140,7 +140,7 @@ async def result_handler(query: types.ChosenInlineResult):
     except NoGameInChatError:
         return
     else:
-        if game.field != field_old:
+        if game.field != field_old or game.current_player != current:
             if game.current_player == current:
                 text = (
                     f'✅ <b>Хід залишається!</b>\n\n'

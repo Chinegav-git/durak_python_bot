@@ -1,16 +1,21 @@
 import logging
 from aiogram import executor
-from loader import dp, bot  # Импортируем ОДИН И ТОТ ЖЕ объект dp
+from loader import dp, bot  # Імпортуємо ОДИН І ТОЙ ЖЕ об'єкт dp
 from durak.filters import IsAdminFilter
+
+# Імпортуємо самі роутери з пакету handlers
+from durak.handlers import game, info, gamemode_router
 
 logging.basicConfig(level=logging.INFO)
 
-# ШАГ А: Регистрация фильтра (теперь dp из loader знает про 'is_admin')
+# Реєстрація фільтра
 dp.filters_factory.bind(IsAdminFilter)
 
-# ШАГ Б: Импорт хендлеров ПОСЛЕ регистрации
-from durak import handlers
+# Реєстрація роутерів
+dp.include(game.router) # Реєструємо ігровий роутер
+dp.include(info.router) # Реєструємо інформаційний роутер
+dp.include(gamemode_router) # Реєструємо роутер для /gamemode
 
 if __name__ == '__main__':
-    # Используем dp из loader для запуска
+    # Використовуємо dp з loader для запуску
     executor.start_polling(dp, skip_updates=True)
