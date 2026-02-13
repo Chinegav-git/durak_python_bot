@@ -10,7 +10,7 @@ from loader import dp
 @dp.message_handler(Command("gamemode"))
 @session
 async def set_game_mode(message: types.Message):
-    game = dp.bot['game']
+    game = dp.bot.get('game')  # <-- ВИПРАВЛЕНО
     if not game or game.chat_id != message.chat.id:
         await message.answer("Гра не створена в цьому чаті.")
         return
