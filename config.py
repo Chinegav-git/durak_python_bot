@@ -37,6 +37,7 @@ class Commands:
     STATS: str = 'stats'
     OFF_STATS: str = 'off_stats'
     ON_STATS: str = 'on_stats'
+    TEST_WIN: str = 'test_win'
     
 
 COMMANDS: List[Tuple[str, str]] = [
