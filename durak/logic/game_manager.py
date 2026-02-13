@@ -15,83 +15,68 @@ class GameManager:
 
     def set_bot(self, bot: Bot):
         self.bot = bot
-    
+
     @db_session
     def new_game(self, chat: types.Chat, creator: types.User) -> Game:
         """
+        Створює нову гру, забезпечуючи стійкість до перезапусків.
         errors:
-
-        - GameAlreadyInChatError
+        - GameAlreadyInChatError (якщо гра вже є в пам'яті)
         """
-        # Check for game in memory
-        if self.games.get(chat.id, None) is not None:
+        # 1. Перевірка наявності гри в пам'яті
+        if self.games.get(chat.id):
             raise GameAlreadyInChatError
 
-        # Check for game in DB (robust check after restart)
-        chat_setting = ChatSetting.get(id=chat.id)
-        if chat_setting and chat_setting.display_mode == "game_active":
-            # Game exists in DB but not in memory, means bot restarted.
-            # We reset the state to allow a new game.
-            chat_setting.display_mode = 'text' 
+        # 2. Отримання або створення налаштувань чату та перевірка "завислої" гри
+        chat_setting = ChatSetting.get_or_create(chat.id)
+        if chat_setting.is_game_active:
+            # Якщо гра позначена як активна в БД, але її немає в пам'яті,
+            # це означає, що бот перезапускався. Скидаємо стан.
+            chat_setting.is_game_active = False
 
-        # Create new game
+        # 3. Створення нової гри та збереження її в пам'яті
         game = Game(chat, creator)
         self.games[chat.id] = game
-        
-        # Mark game as active in DB
-        if not chat_setting:
-            chat_setting = ChatSetting(id=chat.id)
-        chat_setting.display_mode = "game_active"
+
+        # 4. Позначення гри як активної в базі даних
+        chat_setting.is_game_active = True
 
         return game
-    
 
     def get_game_from_chat(self, chat: types.Chat) -> Game:
         """errors:
-
         - NoGameInChatError
         """
         game = self.games.get(chat.id, None)
-
         if game is not None:
             return game
         raise NoGameInChatError
-    
+
     @db_session
     def end_game(self, target: Union[types.Chat, Game]) -> None:
         """errors:
-
         - NoGameInChatError
         """
-        if isinstance(target, types.Chat):
-            chat = target
-        else:
-            chat = target.chat
-        
-        game = self.games.get(chat.id, None)
-        if game is not None:
-            players = game.players
-            
-            for pl in players:
-                # stats
-                user = pl.user
-                us = UserSetting.get(id=user.id)
-                if not us:
-                    us = UserSetting(id=user.id)
+        chat_id = target.chat.id if isinstance(target, Game) else target.id
 
-                if us.stats:
-                    us.games_played += 1
-            
-            del self.games[chat.id]
+        # Видалення гри з пам'яті
+        game = self.games.pop(chat_id, None)
 
-        # Always reset the DB state
-        chat_setting = ChatSetting.get(id=chat.id)
+        # Завжди оновлюємо стан в БД
+        chat_setting = ChatSetting.get(id=chat_id)
         if chat_setting:
-            chat_setting.display_mode = 'text'
+            chat_setting.is_game_active = False
 
+        # Якщо гри не було в пам'яті, кидаємо помилку
         if game is None:
             raise NoGameInChatError
         
+        # Оновлення статистики гравців
+        for pl in game.players:
+            us = UserSetting.get_or_create(pl.user.id)
+            if us.stats:
+                us.games_played += 1
+
     async def test_win_game(self, game: Game, winner_id: int):
         """
         Завершує гру та оголошує переможця для тесту.
@@ -103,34 +88,22 @@ class GameManager:
         if not winner:
             raise ValueError("Гравця з таким ID не знайдено в цій грі.")
 
-        # 1. Correctly stop the game
         game.started = False
         game.winner = winner
 
-        # 2. Build the detailed message
         losers = [p for p in game.players if p.user.id != winner_id]
-        
-        message = "За командою адміністратора, гру примусово завершено!\n\n"
-        message += f"🏆 Переможець:\n- {winner.user.full_name}\n\n"
-        
+        message = f"За командою адміністратора, гру примусово завершено!\n\n🏆 Переможець:\n- {winner.user.full_name}\n\n"
         if losers:
-            message += "Програвші:\n"
-            for loser in losers:
-                message += f"- {loser.user.full_name}\n"
+            message += "Програвші:\n" + '\n'.join([f"- {loser.user.full_name}" for loser in losers])
 
         await self.bot.send_message(game.chat.id, message)
-
-        # 3. Clean up the game session in a separate thread
         await asyncio.to_thread(self.end_game, game)
 
     def join_in_game(self, game: Game, user: types.User) -> None:
         """
         errors:
-
-        - GameStartedError
-        - LobbyClosedError
-        - LimitPlayersInGameError
-        - AlreadyJoinedError
+        - GameStartedError, LobbyClosedError, LimitPlayersInGameError, 
+        - AlreadyJoinedError, AlreadyJoinedInGlobalError
         """
         if game.started:
             raise GameStartedError
@@ -138,51 +111,27 @@ class GameManager:
             raise LobbyClosedError
         if len(game.players) >= game.MAX_PLAYERS:
             raise LimitPlayersInGameError
-        
-        for _player in game.players:
-            if user == _player.user:
-                raise AlreadyJoinedError
-        
+        if any(p.user.id == user.id for p in game.players):
+            raise AlreadyJoinedError
         if self.check_user_ex_in_all_games(user):
             raise AlreadyJoinedInGlobalError
 
         player = Player(game, user)
         game.players.append(player)
 
-        return
-        
-
     def start_game(self, game: Game) -> None:
         """
         errors:
-
-        - GameStartedError
-        - NotEnoughPlayersError
+        - GameStartedError, NotEnoughPlayersError
         """
         if game.started:
             raise GameStartedError
         if len(game.players) <= 1:
             raise NotEnoughPlayersError
         game.start()
-        
 
     def player_for_user(self, user: types.User) -> Player | None:
-        for game in self.games.values():
-            for player in game.players:
-                if player.user == user:
-                    return player
-        
-        return None
-    
+        return next((p for g in self.games.values() for p in g.players if p.user.id == user.id), None)
 
     def check_user_ex_in_all_games(self, user: types.User) -> bool:
-        """
-        True - exist
-        False - not exist
-        """
-        for game in self.games.values():
-            for player in game.players:
-                if player.user.id == user.id:
-                    return True
-        
-        return False
+        return self.player_for_user(user) is not None
