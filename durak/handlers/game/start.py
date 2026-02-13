@@ -12,8 +12,8 @@ from durak.logic.utils import (
 @dp.message_handler(commands=[Commands.START], chat_type=['group', 'supergroup'])
 async def start_handler(message: types.Message):
     ''' Start a game '''
-    user = types.User.get_current()
-    chat = types.Chat.get_current()
+    user = message.from_user
+    chat = message.chat
 
     try:
         game = gm.get_game_from_chat(chat)
