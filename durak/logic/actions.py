@@ -8,18 +8,18 @@ import asyncio
 async def win(game: Game, player: Player):
     chat = game.chat
     bot = Bot.get_current()
+    
+    # Perform all database operations first, outside of any async logic
+    with session:
+        user = player.user
+        us = UserSetting.get(id=user.id)
+        if not us:
+            us = UserSetting(id=user.id)
+        if us.stats:
+            us.first_places += 1  # first winner
 
+    # Now, perform async operations
     if not game.winner:
-        # First
-        # satistic
-        with session as s:
-            user = player.user
-            us = UserSetting.get(id=user.id)
-            if not us:
-                us = UserSetting(id=user.id)
-            if us.stats:
-                us.first_places += 1  # first winner
-            
         game.winner = player
         await bot.send_message(chat.id, f'🏆 ({player.user.get_mention(as_html=True)}) - переможець!')
     else:    
@@ -38,9 +38,9 @@ async def do_turn(game: Game, skip_def: bool = False):
     while True:
         if len(game.players) <= 1:
             if gm.get_game_from_chat(chat):
-                gm.end_game(game.chat)
                 winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
                 losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                gm.end_game(game.chat) # End game before sending message
                 await bot.send_message(
                     chat.id,
                     f'🎮 Гру закінчено!\n\n'
@@ -60,9 +60,9 @@ async def do_turn(game: Game, skip_def: bool = False):
                         break
                     except NotEnoughPlayersError:
                         if gm.get_game_from_chat(chat):
-                            gm.end_game(game.chat)
                             winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
                             losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                            gm.end_game(game.chat)
                             await bot.send_message(
                                 chat.id,
                                 f'🎮 Гру закінчено!\n\n'
@@ -77,9 +77,9 @@ async def do_turn(game: Game, skip_def: bool = False):
                         await win(game, game.current_player)
 
                     if gm.get_game_from_chat(chat):
-                        gm.end_game(game.chat)
                         winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
                         losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                        gm.end_game(game.chat)
                         await bot.send_message(
                             chat.id,
                             f'🎮 Гру закінчено!\n\n'
@@ -104,12 +104,11 @@ async def do_leave_player(player: Player, from_turn: bool = False):
         return
     
     try:
-        with session as s:
+        with session:
             user = player.user
             us = UserSetting.get(id=user.id)
             if not us:
                 us = UserSetting(id=user.id)
-
             if us.stats:
                 us.games_played += 1
     except Exception as e:
@@ -132,9 +131,8 @@ async def do_leave_player(player: Player, from_turn: bool = False):
     if len(game.players) <= 1:
         raise NotEnoughPlayersError
     
-    if player in [current, opponent]:
-        if not from_turn:
-            await do_turn(game)
+    if player in [current, opponent] and not from_turn:
+        await do_turn(game)
 
 
 async def do_pass(player: Player):
@@ -164,10 +162,14 @@ async def do_draw(player: Player):
     game = player.game
     bot = Bot.get_current()
     
+    # First, get settings from DB
     with session:
-        chat_settings = ChatSetting.get_or_create(game.chat.id)
-        display_mode = chat_settings.display_mode
+        cs = ChatSetting.get(id=game.chat.id)
+        if not cs:
+            cs = ChatSetting(id=game.chat.id)
+        display_mode = cs.display_mode
 
+    # Now, perform async operations
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
         for sticker_message_id in game.attack_sticker_message_ids.values():
             try:
@@ -185,21 +187,29 @@ async def do_attack_card(player: Player, card: Card):
     user = player.user
     bot = Bot.get_current()
     
+    # --- DB Block ---
     with session:
-        chat_settings = ChatSetting.get_or_create(game.chat.id)
-        display_mode = chat_settings.display_mode
+        # Inlined get_or_create for ChatSetting
+        cs = ChatSetting.get(id=game.chat.id)
+        if not cs:
+            cs = ChatSetting(id=game.chat.id)
+        display_mode = cs.display_mode
+
+        # Inlined get_or_create for UserSetting
         us = UserSetting.get(id=user.id)
         if not us:
             us = UserSetting(id=user.id)
         if us.stats:
             us.cards_played += 1
             us.cards_atack += 1
+    # --- End of DB Block ---
     
     if not player.cards:
         game.is_pass = True
         if len(game.players) <= 2 and not game.deck.cards:
             game.is_final = True
 
+    # --- Async Block ---
     try:
         if display_mode == 'text':
             beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
@@ -242,9 +252,15 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     user = player.user
     bot = Bot.get_current()
     
+    # --- DB Block ---
     with session:
-        chat_settings = ChatSetting.get_or_create(game.chat.id)
-        display_mode = chat_settings.display_mode
+        # Inlined get_or_create for ChatSetting
+        cs = ChatSetting.get(id=game.chat.id)
+        if not cs:
+            cs = ChatSetting(id=game.chat.id)
+        display_mode = cs.display_mode
+
+        # Inlined get_or_create for UserSetting
         us = UserSetting.get(id=user.id)
         if not us:
             us = UserSetting(id=user.id)
@@ -252,6 +268,7 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
         if us.stats:
             us.cards_played += 1
             us.cards_beaten += 1
+    # --- End of DB Block ---
     
     if game.all_beaten_cards and len(game.players) == 2 and not game.attacker_can_continue:
         await do_turn(game)
@@ -263,6 +280,7 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
 
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)
     
+    # --- ASYNC Block ---
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
         sticker_id = game.attack_sticker_message_ids.pop(atk_card, None)
         if sticker_id:
