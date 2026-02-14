@@ -64,7 +64,12 @@ async def result_handler(query: types.ChosenInlineResult):
     
     elif len(split_result_id) == 1:  # ATK
         try:
-            atk_card = c.from_str(split_result_id[0])
+            atk_card_str = split_result_id[0]
+            # Find the actual card object from the player's hand
+            atk_card = next((card for card in player.cards if repr(card) == atk_card_str), None)
+            if atk_card is None:
+                # Fallback for safety, though it should ideally not be reached
+                atk_card = c.from_str(atk_card_str)
         except:
             return
         
@@ -107,8 +112,17 @@ async def result_handler(query: types.ChosenInlineResult):
             await send_cheat_att(player)
             return
         try:
-            atk_card = c.from_str(split_result_id[0])
-            def_card = c.from_str(split_result_id[1])
+            atk_card_str = split_result_id[0]
+            def_card_str = split_result_id[1]
+
+            # Find the actual card objects
+            atk_card = next((card for card in game.attacking_cards if repr(card) == atk_card_str), None)
+            def_card = next((card for card in player.cards if repr(card) == def_card_str), None)
+
+            if atk_card is None or def_card is None:
+                # Fallback for safety
+                atk_card = c.from_str(atk_card_str)
+                def_card = c.from_str(def_card_str)
         except:
             return
         else:

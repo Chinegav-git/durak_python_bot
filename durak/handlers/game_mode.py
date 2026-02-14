@@ -3,7 +3,7 @@ from aiogram.dispatcher.filters import Command
 from pony.orm import db_session
 
 from durak.db.chat_settings import ChatSetting
-from durak.logic.utils import user_can_change_gamemode
+# from durak.logic.utils import user_can_change_gamemode
 from loader import dp
 
 
@@ -15,9 +15,9 @@ async def set_game_mode(message: types.Message):
 
     # First, check permissions.
     # This is an async operation and must be outside a db_session.
-    if not await user_can_change_gamemode(user, chat):
-        await message.answer("🚫 Тільки адміністратор чату може змінювати режим гри.")
-        return
+    # if not await user_can_change_gamemode(user, chat):
+    #     await message.answer("🚫 Тільки адміністратор чату може змінювати режим гри.")
+    #     return
 
     # All database operations are now grouped in one synchronous block.
     reply_message = ""
@@ -29,10 +29,10 @@ async def set_game_mode(message: types.Message):
             reply_message = (
                 f"Поточний режим гри: `{current_mode}`\n\n"
                 f"Доступні режими:\n"
-                f"• `text` — класичний текстовий режим\n"
-                f"• `text_and_sticker` — текст та стікери карт\n"
-                f"• `sticker_and_button` — стікери та кнопки (мінімалістично)\n\n"
-                f"Щоб змінити режим, введіть: `/gamemode [назва_режиму]`"
+                f"📝 `/gamemode text` — класичний текстовий режим\n"
+                f"🃏 `/gamemode text_and_sticker` — текст та стікери карт\n"
+                f"🕹️ `/gamemode sticker_and_button` — стікери та кнопки (мінімалістично)\n\n"
+                f"Щоб змінити режим, просто натисніть на потрібну команду."
             )
         else:
             new_mode = args.lower()

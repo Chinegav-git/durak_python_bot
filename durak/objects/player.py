@@ -24,6 +24,7 @@ class Player:
         self.user: types.User = user  # User obj | from Aiogram
         self.game: Game = game  # Game obj
         self.cards: List[Card] = list()
+        self.finished_game: bool = False # Player status
         self.logger = logging.getLogger(__name__)
         self.anti_cheat: int = int(time())
         self.turn_started: datetime = datetime.now()
