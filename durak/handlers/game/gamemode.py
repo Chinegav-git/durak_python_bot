@@ -1,25 +1,35 @@
 from aiogram import types, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from pony.orm import db_session
 from ..db import ChatSetting
-from ..logic.gamelist import get_gamelist_markup, get_gamelist_text
 
 router = Router()
 
 @router.message(Command("gamemode"))
 @db_session
-async def gamemode_handler(message: types.Message):
+async def gamemode_handler(message: types.Message, command: CommandObject):
     chat_setting = ChatSetting.get_or_create(message.chat.id)
     
-    # Логіка для зміни режиму
-    if chat_setting.display_mode == 'text':
-        chat_setting.display_mode = 'sticker_and_button'
-        response_text = "Режим гри змінено на: *Стікери та кнопки*"
-    elif chat_setting.display_mode == 'sticker_and_button':
-        chat_setting.display_mode = 'text_and_sticker'
-        response_text = "Режим гри змінено на: *Текст та стікери*"
-    else: # text_and_sticker
-        chat_setting.display_mode = 'text'
-        response_text = "Режим гри змінено на: *Лише текст*"
+    new_mode = command.args
+    available_modes = ['text', 'text_and_sticker', 'sticker_and_button']
+    
+    if not new_mode:
+        # Якщо аргументів немає, показуємо поточний режим та доступні
+        response_text = (
+            f"Поточний режим гри: *{chat_setting.display_mode}*\n\n"
+            f"Доступні режими:\n"
+            f"- `text`: лише текст\n"
+            f"- `text_and_sticker`: текст та стікери\n"
+            f"- `sticker_and_button`: стікери та кнопки\n\n"
+            f"Щоб змінити режим, вкажіть його назву, наприклад: `/gamemode text`"
+        )
+        await message.answer(response_text, parse_mode="Markdown")
+        return
 
-    await message.answer(response_text, parse_mode="Markdown")
+    if new_mode in available_modes:
+        # Встановлюємо новий режим
+        chat_setting.display_mode = new_mode
+        await message.answer(f"Режим гри змінено на: *{new_mode}*", parse_mode="Markdown")
+    else:
+        # Якщо вказано невірний режим
+        await message.answer(f"Невідомий режим: `{new_mode}`. Спробуйте один із доступних: `text`, `text_and_sticker`, `sticker_and_button`.")
