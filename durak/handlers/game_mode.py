@@ -1,6 +1,6 @@
 from aiogram import types
 from aiogram.dispatcher.filters import Command
-from pony.orm import db_session, commit
+from pony.orm import db_session
 
 from durak.db.chat_settings import ChatSetting
 from durak.logic.utils import user_is_creator
@@ -13,17 +13,16 @@ async def set_game_mode(message: types.Message):
     chat_id = message.chat.id
     user = message.from_user
     args = message.get_args()
-
     reply_message = None
+    parse_mode = 'Markdown'
 
     try:
         game = gm.get_game_from_chat(message.chat)
-        
         with db_session:
             if not user_is_creator(user, game):
                 reply_message = "Тільки творець гри може змінювати її режим."
             else:
-                chat_setting = ChatSetting.get_or_create(chat_id=chat_id)
+                chat_setting = ChatSetting.get_or_create(chat_id)
                 if not args:
                     current_mode = chat_setting.display_mode
                     reply_message = (
@@ -41,18 +40,14 @@ async def set_game_mode(message: types.Message):
                         reply_message = f"✅ Режим гри змінено на `{new_mode}`"
                     else:
                         reply_message = "Невідомий режим. Доступні: `text`, `text_and_sticker`, `sticker_and_button`."
-            
-            # Commit changes and then send the reply within the same session
-            commit()
-            if reply_message:
-                await message.answer(reply_message, parse_mode='Markdown')
 
     except NoGameInChatError:
-        reply_message = "Гра не створена в цьому чаті."
         with db_session:
-            chat_setting = ChatSetting.get(chat_id=chat_id)
+            reply_message = "Гра не створена в цьому чаті."
+            parse_mode = None
+            chat_setting = ChatSetting.get(id=chat_id)
             if chat_setting and chat_setting.is_game_active:
-                chat_setting.is_game_active = False  # Reset stale game state
-                commit()
-            # Send reply within the session to avoid transaction errors
-            await message.answer(reply_message)
+                chat_setting.is_game_active = False
+    
+    if reply_message:
+        await message.answer(reply_message, parse_mode=parse_mode)
