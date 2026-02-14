@@ -116,11 +116,14 @@ class Player:
     
 
     def can_add_to_field(self, card: Card):
+        if self == self.game.opponent_player:
+            return False
+
         field = self.game.field
 
         if not field:
-            return True
-        
+            return self == self.game.current_player
+
         for atk_card, def_card in field.items():
             if self.card_match(atk_card, card) or \
                 self.card_match(def_card, card):

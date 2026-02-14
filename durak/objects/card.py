@@ -116,6 +116,7 @@ class Card:
         # Normalize to enums to keep comparisons consistent across the codebase
         self.value: Values = value if isinstance(value, Values) else Values(str(value))
         self.suit: Suits = suit if isinstance(suit, Suits) else Suits(str(suit))
+        self.sticker_id: str | None = STICKERS.get(repr(self))
 
     def __str__(self) -> str:
         # Mapping for face cards

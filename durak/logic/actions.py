@@ -22,9 +22,9 @@ async def win(game: Game, player: Player):
     # ASYNCHRONOUS BLOCK: Now, perform async operations.
     if not game.winner:
         game.winner = player
-        await bot.send_message(chat.id, f'🏆 ({player.user.get_mention(as_html=True)}) - переможець!')
+        await bot.send_message(chat.id, f'🏆 <a href="tg://user?id={player.user.id}">{player.user.full_name}</a> - переможець!')
     else:    
-        await bot.send_message(chat.id, f'🎉 ({player.user.get_mention(as_html=True)}) - теж перемагає!')
+        await bot.send_message(chat.id, f'🎉 <a href="tg://user?id={player.user.id}">{player.user.full_name}</a> - теж перемагає!')
     game.winners.append(player)
 
 
@@ -35,8 +35,8 @@ async def do_turn(game: Game, skip_def: bool = False):
     while True:
         if len(game.players) <= 1:
             if gm.get_game_from_chat(chat):
-                winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
-                losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                 gm.end_game(game.chat)
                 await bot.send_message(
                     chat.id,
@@ -57,8 +57,8 @@ async def do_turn(game: Game, skip_def: bool = False):
                         break
                     except NotEnoughPlayersError:
                         if gm.get_game_from_chat(chat):
-                            winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
-                            losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                            winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                            losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                             gm.end_game(game.chat)
                             await bot.send_message(
                                 chat.id,
@@ -74,8 +74,8 @@ async def do_turn(game: Game, skip_def: bool = False):
                         await win(game, game.current_player)
 
                     if gm.get_game_from_chat(chat):
-                        winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
-                        losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
+                        winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                        losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                         gm.end_game(game.chat)
                         await bot.send_message(
                             chat.id,

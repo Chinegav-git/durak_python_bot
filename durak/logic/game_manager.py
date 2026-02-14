@@ -53,13 +53,13 @@ class GameManager:
         if winners:
             title = "🏆 Переможці:" if len(winners) > 1 else "🏆 Переможець:"
             message_parts.append(title)
-            message_parts.extend([f"- {p.user.full_name}" for p in winners])
+            message_parts.extend([f'- <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in winners])
         
         if losers:
             if winners:
                 message_parts.append("")
             message_parts.append("Програвші:")
-            message_parts.extend([f"- {p.user.full_name}" for p in losers])
+            message_parts.extend([f'- <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in losers])
 
         return "\n".join(message_parts)
 
@@ -107,12 +107,12 @@ class GameManager:
 
         message_parts = ["За командою адміністратора, гру примусово завершено!\n"]
         message_parts.append("🏆 Переможець:")
-        message_parts.append(f"- {winner.user.full_name}")
+        message_parts.append(f'- <a href="tg://user?id={winner.user.id}">{winner.user.full_name}</a>')
         
         if losers:
             message_parts.append("")
             message_parts.append("Програвші:")
-            message_parts.extend([f"- {loser.user.full_name}" for loser in losers])
+            message_parts.extend([f'- <a href="tg://user?id={loser.user.id}">{loser.user.full_name}</a>' for loser in losers])
 
         message = "\n".join(message_parts)
         await self.bot.send_message(game.chat.id, message)
