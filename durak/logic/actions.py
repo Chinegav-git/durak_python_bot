@@ -42,14 +42,14 @@ async def do_turn(game: Game, skip_def: bool = False):
     while True:
         if len(game.players) <= 1:
             if gm.get_game_from_chat(chat):
-                winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
-                losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
+                winners_text = "\\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                losers_text = "\\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                 gm.end_game(game.chat)
                 await bot.send_message(
                     chat.id,
-                    f'🎮 Гру закінчено!\n\n'
-                    f'<b>Переможці:</b>\n{winners_text}\n\n'
-                    f'<b>Програвші:</b>\n{losers_text}'
+                    f'🎮 Гру закінчено!\\n\\n'
+                    f'<b>Переможці:</b>\\n{winners_text}\\n\\n'
+                    f'<b>Програвші:</b>\\n{losers_text}'
                 )
             return
 
@@ -64,14 +64,14 @@ async def do_turn(game: Game, skip_def: bool = False):
                         break
                     except NotEnoughPlayersError:
                         if gm.get_game_from_chat(chat):
-                            winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
-                            losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
+                            winners_text = "\\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                            losers_text = "\\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                             gm.end_game(game.chat)
                             await bot.send_message(
                                 chat.id,
-                                f'🎮 Гру закінчено!\n\n'
-                                f'<b>Переможці:</b>\n{winners_text}\n\n'
-                                f'<b>Програвші:</b>\n{losers_text}'
+                                f'🎮 Гру закінчено!\\n\\n'
+                                f'<b>Переможці:</b>\\n{winners_text}\\n\\n'
+                                f'<b>Програвші:</b>\\n{losers_text}'
                             )
                         return
                 else:
@@ -81,14 +81,14 @@ async def do_turn(game: Game, skip_def: bool = False):
                         await win(game, game.current_player)
 
                     if gm.get_game_from_chat(chat):
-                        winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
-                        losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
+                        winners_text = "\\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                        losers_text = "\\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                         gm.end_game(game.chat)
                         await bot.send_message(
                             chat.id,
-                            f'🎮 Гру закінчено!\n\n'
-                            f'<b>Переможці:</b>\n{winners_text}\n\n'
-                            f'<b>Програвші:</b>\n{losers_text}'
+                            f'🎮 Гру закінчено!\\n\\n'
+                            f'<b>Переможці:</b>\\n{winners_text}\\n\\n'
+                            f'<b>Програвші:</b>\\n{losers_text}'
                         )
                     return
 
@@ -156,6 +156,7 @@ async def do_pass(player: Player):
 
     asyncio.create_task(_delete_later(msg.chat.id, msg.message_id))
 
+    # The turn only ends on pass if all cards on the table have already been beaten.
     if game.all_beaten_cards:
         await do_turn(game)
 
@@ -221,12 +222,21 @@ async def do_attack_card(player: Player, card: Card):
         style = 'trump_normal' if card.suit == game.trump else 'normal'
         sticker_id = c.THEMES[c.ACTIVE_THEME][style].get(repr(card))
         if sticker_id:
-            sticker_msg = await bot.send_sticker(game.chat.id, sticker_id)
-            game.attack_sticker_message_ids[card] = sticker_msg.message_id
+            try:
+                sticker_msg = await bot.send_sticker(game.chat.id, sticker_id, reply_markup=beat_markup if display_mode == 'sticker_and_button' else None)
+                if sticker_msg:
+                    game.attack_sticker_message_ids[card] = sticker_msg.message_id
+            except Exception: # Can be Telegram a bad request if the sticker is invalid, for example
+                pass
 
-    text = "​"  # Zero-width space for sticker_and_button mode
-    if display_mode in ['text', 'text_and_sticker']:
-        text = f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}"
+
+    text = "​"  # Zero-width space
+    if display_mode == 'text' or display_mode == 'text_and_sticker' or (display_mode == 'sticker_and_button' and not sticker_msg):
+        text = f"⚔️ <b>{user.get_mention(as_html=True)}</b>\\nпідкинув(ла) карту: {str(card)}\\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}"
+
+    if display_mode == 'sticker_and_button' and sticker_msg:
+        # Don't send a separate message if the button is already on the sticker
+        return
 
     msg = await bot.send_message(
         game.chat.id,
