@@ -12,6 +12,17 @@ class NotEnoughPlayersError(Exception):
     pass
 
 
+async def _delete_message_after_delay(chat_id: int, message_id: int, delay: int):
+    """Coroutine to delete a message after a specified delay."""
+    await asyncio.sleep(delay)
+    try:
+        bot = Bot.get_current()
+        await bot.delete_message(chat_id, message_id)
+    except Exception:
+        # Ignore exceptions if the message is already deleted or not found
+        pass
+
+
 async def win(game: Game, player: Player):
     chat = game.chat
     bot = Bot.get_current()
@@ -255,25 +266,19 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
             us.cards_played += 1
             us.cards_beaten += 1
 
-    # --- CORRECT MESSAGE CLEANUP ---
-    # Clean up the specific message for the card that was just beaten.
+    # --- DELAYED MESSAGE CLEANUP ---
+    # Schedule the deletion of the attack announcement message after a delay.
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)
     if announce_id:
-        try:
-            await bot.delete_message(game.chat.id, announce_id)
-        except Exception:
-            pass
+        asyncio.create_task(_delete_message_after_delay(game.chat.id, announce_id, 7))
 
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
         sticker_id = game.attack_sticker_message_ids.pop(atk_card, None)
         if sticker_id:
-            try:
-                await bot.delete_message(game.chat.id, sticker_id)
-            except Exception:
-                pass
+            asyncio.create_task(_delete_message_after_delay(game.chat.id, sticker_id, 7))
 
     # --- TURN END LOGIC ---
-    if game.all_cards_beaten:
+    if game.all_beaten_cards:
         all_attackers_done = True
         passed_attackers = getattr(game, '_temp_passed_attackers', set())
         for p in game.attackers:
