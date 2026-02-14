@@ -36,20 +36,24 @@ async def win(game: Game, player: Player):
 
 
 async def do_turn(game: Game, skip_def: bool = False):
+    # Clean up temporary state at the end of a turn
+    if hasattr(game, '_temp_passed_attackers'):
+        del game._temp_passed_attackers
+
     chat = game.chat
     bot = Bot.get_current()
 
     while True:
         if len(game.players) <= 1:
             if gm.get_game_from_chat(chat):
-                winners_text = "\\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
-                losers_text = "\\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
+                winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                 gm.end_game(game.chat)
                 await bot.send_message(
                     chat.id,
-                    f'🎮 Гру закінчено!\\n\\n'
-                    f'<b>Переможці:</b>\\n{winners_text}\\n\\n'
-                    f'<b>Програвші:</b>\\n{losers_text}'
+                    f'🎮 Гру закінчено!\n\n'
+                    f'<b>Переможці:</b>\n{winners_text}\n\n'
+                    f'<b>Програвші:</b>\n{losers_text}'
                 )
             return
 
@@ -64,14 +68,14 @@ async def do_turn(game: Game, skip_def: bool = False):
                         break
                     except NotEnoughPlayersError:
                         if gm.get_game_from_chat(chat):
-                            winners_text = "\\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
-                            losers_text = "\\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
+                            winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                            losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                             gm.end_game(game.chat)
                             await bot.send_message(
                                 chat.id,
-                                f'🎮 Гру закінчено!\\n\\n'
-                                f'<b>Переможці:</b>\\n{winners_text}\\n\\n'
-                                f'<b>Програвші:</b>\\n{losers_text}'
+                                f'🎮 Гру закінчено!\n\n'
+                                f'<b>Переможці:</b>\n{winners_text}\n\n'
+                                f'<b>Програвші:</b>\n{losers_text}'
                             )
                         return
                 else:
@@ -81,14 +85,14 @@ async def do_turn(game: Game, skip_def: bool = False):
                         await win(game, game.current_player)
 
                     if gm.get_game_from_chat(chat):
-                        winners_text = "\\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
-                        losers_text = "\\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
+                        winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.winners])
+                        losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
                         gm.end_game(game.chat)
                         await bot.send_message(
                             chat.id,
-                            f'🎮 Гру закінчено!\\n\\n'
-                            f'<b>Переможці:</b>\\n{winners_text}\\n\\n'
-                            f'<b>Програвші:</b>\\n{losers_text}'
+                            f'🎮 Гру закінчено!\n\n'
+                            f'<b>Переможці:</b>\n{winners_text}\n\n'
+                            f'<b>Програвші:</b>\n{losers_text}'
                         )
                     return
 
@@ -140,8 +144,13 @@ async def do_leave_player(player: Player, from_turn: bool = False):
 async def do_pass(player: Player):
     game = player.game
     bot = Bot.get_current()
+
+    # Ensure the temporary attribute for passed players exists
+    if not hasattr(game, '_temp_passed_attackers'):
+        game._temp_passed_attackers = set()
     
-    game.is_pass = True
+    game._temp_passed_attackers.add(player.id)
+    
     msg = await bot.send_message(
         game.chat.id,
         f"Пас! {player.user.get_mention(as_html=True)} більше не підкидає."
@@ -156,8 +165,17 @@ async def do_pass(player: Player):
 
     asyncio.create_task(_delete_later(msg.chat.id, msg.message_id))
 
-    # The turn only ends on pass if all cards on the table have already been beaten.
-    if game.all_beaten_cards:
+    # Check if the turn should end after a pass
+    turn_is_over = False
+    if game.all_cards_beaten:
+        possible_attacker_ids = {p.id for p in game.attackers}
+        if game._temp_passed_attackers.issuperset(possible_attacker_ids):
+            turn_is_over = True
+        
+        if not game.attacker_can_continue:
+            turn_is_over = True
+
+    if turn_is_over:
         await do_turn(game)
 
 
@@ -189,6 +207,10 @@ async def do_attack_card(player: Player, card: Card):
     user = player.user
     bot = Bot.get_current()
 
+    # Initialize the passed attackers set for this turn if it doesn't exist
+    if not hasattr(game, '_temp_passed_attackers'):
+        game._temp_passed_attackers = set()
+
     # First, apply game logic changes
     player.play_attack(card)
     
@@ -207,7 +229,8 @@ async def do_attack_card(player: Player, card: Card):
             us.cards_atack += 1
     
     if not player.cards:
-        game.is_pass = True
+        # Mark player as passed if they run out of cards
+        game._temp_passed_attackers.add(player.id)
         if len(game.players) <= 2 and not game.deck.cards:
             game.is_final = True
 
@@ -232,7 +255,7 @@ async def do_attack_card(player: Player, card: Card):
 
     text = "​"  # Zero-width space
     if display_mode == 'text' or display_mode == 'text_and_sticker' or (display_mode == 'sticker_and_button' and not sticker_msg):
-        text = f"⚔️ <b>{user.get_mention(as_html=True)}</b>\\nпідкинув(ла) карту: {str(card)}\\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}"
+        text = f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}"
 
     if display_mode == 'sticker_and_button' and sticker_msg:
         # Don't send a separate message if the button is already on the sticker
@@ -270,8 +293,19 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     
     # --- ASYNCHRONOUS BLOCK ---
     # Check for turn end conditions first
-    if (game.all_beaten_cards and len(game.players) == 2 and not game.attacker_can_continue) or \
-       (game.all_beaten_cards and game.is_pass):
+    turn_is_over = False
+    if game.all_cards_beaten:
+        # Condition 1: All attackers have passed or run out of cards
+        possible_attacker_ids = {p.id for p in game.attackers}
+        passed_attackers = getattr(game, '_temp_passed_attackers', set())
+        if passed_attackers.issuperset(possible_attacker_ids):
+            turn_is_over = True
+        
+        # Condition 2: No one can legally continue the attack
+        if not game.attacker_can_continue:
+            turn_is_over = True
+
+    if turn_is_over:
         await do_turn(game)
         return
 
