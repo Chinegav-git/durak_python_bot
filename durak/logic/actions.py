@@ -1,8 +1,15 @@
+
 from ..objects import *
 from loader import gm
 from ..db import UserSetting, session, ChatSetting
 from aiogram import types, Bot
 import asyncio
+from ..objects import card as c
+
+
+class NotEnoughPlayersError(Exception):
+    """Not enough players to continue the game."""
+    pass
 
 
 async def win(game: Game, player: Player):
@@ -210,8 +217,12 @@ async def do_attack_card(player: Player, card: Card):
 
     sticker_msg = None
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
-        sticker_msg = await bot.send_sticker(game.chat.id, card.sticker_id)
-        game.attack_sticker_message_ids[card] = sticker_msg.message_id
+        # Use 'normal' styles for a beautiful display on the table
+        style = 'trump_normal' if card.suit == game.trump else 'normal'
+        sticker_id = c.THEMES[c.ACTIVE_THEME][style].get(repr(card))
+        if sticker_id:
+            sticker_msg = await bot.send_sticker(game.chat.id, sticker_id)
+            game.attack_sticker_message_ids[card] = sticker_msg.message_id
 
     text = "​"  # Zero-width space for sticker_and_button mode
     if display_mode in ['text', 'text_and_sticker']:

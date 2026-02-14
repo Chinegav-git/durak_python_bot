@@ -184,17 +184,16 @@ class Game:
     def turn(self, skip_def: bool = False) -> None:
         self.logger.debug(f"Switching turn. Skip defender: {skip_def}")
         
-        # Determine the starting point for finding the next attacker
-        start_index_base = self.players.index(self.opponent_player) if not skip_def and self.opponent_player else self.attacker_index
-        
-        for i in range(1, len(self.players) + 1):
-            next_index = (start_index_base + i) % len(self.players)
-            if not self.players[next_index].finished_game:
-                self.attacker_index = next_index
-                break
-        else:
-            self.logger.warning("No active player found to continue.")
-            return
+        if not skip_def:
+            start_index_base = self.players.index(self.opponent_player) if self.opponent_player else self.attacker_index
+            
+            for i in range(1, len(self.players) + 1):
+                next_index = (start_index_base + i) % len(self.players)
+                if not self.players[next_index].finished_game:
+                    self.attacker_index = next_index
+                    break
+            else:
+                self.logger.warning("No active player found to continue.")
 
         self.is_pass = False
         self._clear_field()
