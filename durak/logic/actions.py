@@ -36,12 +36,29 @@ async def win(game: Game, player: Player):
 
 
 async def do_turn(game: Game, skip_def: bool = False):
-    # Clean up temporary state at the end of a turn
+    bot = Bot.get_current()
+    chat = game.chat
+
+    # --- CENTRALIZED CLEANUP ---
+    # Delete all attack announcement messages from the previous turn
+    for msg_id in getattr(game, 'attack_announce_message_ids', {}).values():
+        try:
+            await bot.delete_message(chat.id, msg_id)
+        except Exception:
+            pass
+    game.attack_announce_message_ids = {}
+
+    # Delete all attack sticker messages from the previous turn
+    for sticker_id in getattr(game, 'attack_sticker_message_ids', {}).values():
+        try:
+            await bot.delete_message(chat.id, sticker_id)
+        except Exception:
+            pass
+    game.attack_sticker_message_ids = {}
+    
+    # Clean up the temporary state of passed attackers
     if hasattr(game, '_temp_passed_attackers'):
         del game._temp_passed_attackers
-
-    chat = game.chat
-    bot = Bot.get_current()
 
     while True:
         if len(game.players) <= 1:
@@ -143,61 +160,18 @@ async def do_leave_player(player: Player, from_turn: bool = False):
 
 async def do_pass(player: Player):
     game = player.game
-    bot = Bot.get_current()
-
-    # Ensure the temporary attribute for passed players exists
-    if not hasattr(game, '_temp_passed_attackers'):
-        game._temp_passed_attackers = set()
     
-    game._temp_passed_attackers.add(player.id)
+    # Silently add the player to the set of those who passed this round.
+    # No messages, no complex logic. Just mark the player.
+    if hasattr(game, '_temp_passed_attackers'):
+        getattr(game, '_temp_passed_attackers').add(player.id)
     
-    msg = await bot.send_message(
-        game.chat.id,
-        f"Пас! {player.user.get_mention(as_html=True)} більше не підкидає."
-    )
-
-    async def _delete_later(chat_id: int, message_id: int):
-        await asyncio.sleep(5)
-        try:
-            await bot.delete_message(chat_id=chat_id, message_id=message_id)
-        except Exception:
-            pass
-
-    asyncio.create_task(_delete_later(msg.chat.id, msg.message_id))
-
-    # Check if the turn should end after a pass
-    turn_is_over = False
-    if game.all_cards_beaten:
-        possible_attacker_ids = {p.id for p in game.attackers}
-        if game._temp_passed_attackers.issuperset(possible_attacker_ids):
-            turn_is_over = True
-        
-        if not game.attacker_can_continue:
-            turn_is_over = True
-
-    if turn_is_over:
-        await do_turn(game)
+    # The decision to end the turn is now centralized in do_defence_card and do_draw.
 
 
 async def do_draw(player: Player):
     game = player.game
-    bot = Bot.get_current()
     
-    # SYNCHRONOUS BLOCK: Get settings from DB.
-    display_mode = 'text'
-    with session:
-        cs = ChatSetting.get(id=game.chat.id)
-        if cs:
-            display_mode = cs.display_mode
-
-    # ASYNCHRONOUS BLOCK: Now, perform async operations.
-    if display_mode in ['text_and_sticker', 'sticker_and_button']:
-        for sticker_message_id in game.attack_sticker_message_ids.values():
-            try:
-                await bot.delete_message(chat_id=game.chat.id, message_id=sticker_message_id)
-            except Exception:
-                pass
-
     game.take_all_field()
     await do_turn(game, True)
 
@@ -207,9 +181,13 @@ async def do_attack_card(player: Player, card: Card):
     user = player.user
     bot = Bot.get_current()
 
-    # Initialize the passed attackers set for this turn if it doesn't exist
+    # Create the temporary state for passed attackers at the start of the first attack.
     if not hasattr(game, '_temp_passed_attackers'):
         game._temp_passed_attackers = set()
+    
+    # Prevent a player who has already passed from attacking again.
+    if player.id in getattr(game, '_temp_passed_attackers', set()):
+        return
 
     # First, apply game logic changes
     player.play_attack(card)
@@ -229,8 +207,6 @@ async def do_attack_card(player: Player, card: Card):
             us.cards_atack += 1
     
     if not player.cards:
-        # Mark player as passed if they run out of cards
-        game._temp_passed_attackers.add(player.id)
         if len(game.players) <= 2 and not game.deck.cards:
             game.is_final = True
 
@@ -248,25 +224,25 @@ async def do_attack_card(player: Player, card: Card):
             try:
                 sticker_msg = await bot.send_sticker(game.chat.id, sticker_id, reply_markup=beat_markup if display_mode == 'sticker_and_button' else None)
                 if sticker_msg:
+                    # Store message ID for later deletion
                     game.attack_sticker_message_ids[card] = sticker_msg.message_id
             except Exception: # Can be Telegram a bad request if the sticker is invalid, for example
                 pass
-
 
     text = "​"  # Zero-width space
     if display_mode == 'text' or display_mode == 'text_and_sticker' or (display_mode == 'sticker_and_button' and not sticker_msg):
         text = f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}"
 
-    if display_mode == 'sticker_and_button' and sticker_msg:
-        # Don't send a separate message if the button is already on the sticker
-        return
-
-    msg = await bot.send_message(
-        game.chat.id,
-        text,
-        reply_markup=beat_markup
-    )
-    game.attack_announce_message_ids[card] = msg.message_id
+    msg = None
+    if not (display_mode == 'sticker_and_button' and sticker_msg):
+        msg = await bot.send_message(
+            game.chat.id,
+            text,
+            reply_markup=beat_markup
+        )
+        if msg:
+            # Store message ID for later deletion
+            game.attack_announce_message_ids[card] = msg.message_id
 
             
 async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
@@ -278,12 +254,7 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     player.play_defence(atk_card, def_card)
     
     # SYNCHRONOUS BLOCK
-    display_mode = 'text'
     with session:
-        cs = ChatSetting.get(id=game.chat.id)
-        if cs:
-            display_mode = cs.display_mode
-
         us = UserSetting.get(id=user.id)
         if not us:
             us = UserSetting(id=user.id)
@@ -292,44 +263,23 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
             us.cards_beaten += 1
     
     # --- ASYNCHRONOUS BLOCK ---
-    # Check for turn end conditions first
-    turn_is_over = False
+    
+    # Check for turn end conditions ("Бито!")
     if game.all_cards_beaten:
-        # Condition 1: All attackers have passed or run out of cards
-        possible_attacker_ids = {p.id for p in game.attackers}
+        # Check if all attackers are done
+        all_attackers_done = True
         passed_attackers = getattr(game, '_temp_passed_attackers', set())
-        if passed_attackers.issuperset(possible_attacker_ids):
-            turn_is_over = True
+        for p in game.attackers:
+            if p.id not in passed_attackers and p.can_add_to_field:
+                all_attackers_done = False
+                break
         
-        # Condition 2: No one can legally continue the attack
-        if not game.attacker_can_continue:
-            turn_is_over = True
+        if all_attackers_done:
+            await bot.send_message(game.chat.id, "✅ Бито!")
+            await do_turn(game)
+            return
 
-    if turn_is_over:
-        await do_turn(game)
-        return
-
-    # Clean up messages from the attack phase
-    announce_id = game.attack_announce_message_ids.pop(atk_card, None)
-    if display_mode in ['text_and_sticker', 'sticker_and_button']:
-        sticker_id = game.attack_sticker_message_ids.pop(atk_card, None)
-        if sticker_id:
-            try:
-                await bot.delete_message(chat_id=game.chat.id, message_id=sticker_id)
-            except Exception:
-                pass
-
-    if announce_id:
-        # Schedule deletion of the original attack message
-        async def _delete_later(chat_id: int, message_id: int):
-            await asyncio.sleep(7)
-            try:
-                await bot.delete_message(chat_id=chat_id, message_id=message_id)
-            except Exception:
-                pass
-        asyncio.create_task(_delete_later(game.chat.id, announce_id))
-
-    # Send confirmation message
+    # If the turn is not over, send a confirmation of the defence
     toss_more_markup = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(text='↪️ Підкинути ще', switch_inline_query_current_chat='')]
     ])
@@ -338,3 +288,4 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
         f"🛡️ <b>{user.get_mention(as_html=True)}</b> побив(ла) карту {str(atk_card)} картою {str(def_card)}",
         reply_markup=toss_more_markup,
     )
+
