@@ -36,29 +36,12 @@ async def win(game: Game, player: Player):
 
 
 async def do_turn(game: Game, skip_def: bool = False):
-    bot = Bot.get_current()
-    chat = game.chat
-
-    # --- CENTRALIZED CLEANUP ---
-    # Delete all attack announcement messages from the previous turn
-    for msg_id in getattr(game, 'attack_announce_message_ids', {}).values():
-        try:
-            await bot.delete_message(chat.id, msg_id)
-        except Exception:
-            pass
-    game.attack_announce_message_ids = {}
-
-    # Delete all attack sticker messages from the previous turn
-    for sticker_id in getattr(game, 'attack_sticker_message_ids', {}).values():
-        try:
-            await bot.delete_message(chat.id, sticker_id)
-        except Exception:
-            pass
-    game.attack_sticker_message_ids = {}
-    
-    # Clean up the temporary state of passed attackers
+    # Clean up temporary state at the end of a turn
     if hasattr(game, '_temp_passed_attackers'):
         del game._temp_passed_attackers
+
+    chat = game.chat
+    bot = Bot.get_current()
 
     while True:
         if len(game.players) <= 1:
@@ -161,17 +144,34 @@ async def do_leave_player(player: Player, from_turn: bool = False):
 async def do_pass(player: Player):
     game = player.game
     
-    # Silently add the player to the set of those who passed this round.
-    # No messages, no complex logic. Just mark the player.
-    if hasattr(game, '_temp_passed_attackers'):
-        getattr(game, '_temp_passed_attackers').add(player.id)
+    if not hasattr(game, '_temp_passed_attackers'):
+        game._temp_passed_attackers = set()
     
-    # The decision to end the turn is now centralized in do_defence_card and do_draw.
+    game._temp_passed_attackers.add(player.user.id)
+    
+    # Pass is now silent. The decision to end the turn is centralized 
+    # in do_defence_card after checking all attackers' statuses.
 
 
 async def do_draw(player: Player):
     game = player.game
-    
+    bot = Bot.get_current()
+
+    # Clean up all attack messages as the turn is forfeit
+    for msg_id in getattr(game, 'attack_announce_message_ids', {}).values():
+        try:
+            await bot.delete_message(game.chat.id, msg_id)
+        except Exception:
+            pass
+    game.attack_announce_message_ids = {}
+
+    for sticker_id in getattr(game, 'attack_sticker_message_ids', {}).values():
+        try:
+            await bot.delete_message(game.chat.id, sticker_id)
+        except Exception:
+            pass
+    game.attack_sticker_message_ids = {}
+
     game.take_all_field()
     await do_turn(game, True)
 
@@ -181,18 +181,14 @@ async def do_attack_card(player: Player, card: Card):
     user = player.user
     bot = Bot.get_current()
 
-    # Create the temporary state for passed attackers at the start of the first attack.
     if not hasattr(game, '_temp_passed_attackers'):
         game._temp_passed_attackers = set()
-    
-    # Prevent a player who has already passed from attacking again.
-    if player.id in getattr(game, '_temp_passed_attackers', set()):
+
+    if player.user.id in getattr(game, '_temp_passed_attackers', set()):
         return
 
-    # First, apply game logic changes
     player.play_attack(card)
     
-    # SYNCHRONOUS BLOCK
     display_mode = 'text'
     with session:
         cs = ChatSetting.get(id=game.chat.id)
@@ -210,23 +206,20 @@ async def do_attack_card(player: Player, card: Card):
         if len(game.players) <= 2 and not game.deck.cards:
             game.is_final = True
 
-    # ASYNCHRONOUS BLOCK
     beat_markup = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]
     ])
 
     sticker_msg = None
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
-        # Use 'normal' styles for a beautiful display on the table
         style = 'trump_normal' if card.suit == game.trump else 'normal'
         sticker_id = c.THEMES[c.ACTIVE_THEME][style].get(repr(card))
         if sticker_id:
             try:
                 sticker_msg = await bot.send_sticker(game.chat.id, sticker_id, reply_markup=beat_markup if display_mode == 'sticker_and_button' else None)
                 if sticker_msg:
-                    # Store message ID for later deletion
                     game.attack_sticker_message_ids[card] = sticker_msg.message_id
-            except Exception: # Can be Telegram a bad request if the sticker is invalid, for example
+            except Exception:
                 pass
 
     text = "​"  # Zero-width space
@@ -241,7 +234,6 @@ async def do_attack_card(player: Player, card: Card):
             reply_markup=beat_markup
         )
         if msg:
-            # Store message ID for later deletion
             game.attack_announce_message_ids[card] = msg.message_id
 
             
@@ -250,27 +242,42 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     user = player.user
     bot = Bot.get_current()
 
-    # First, apply game logic changes
     player.play_defence(atk_card, def_card)
     
-    # SYNCHRONOUS BLOCK
     with session:
+        cs = ChatSetting.get(id=game.chat.id)
+        display_mode = cs.display_mode if cs else 'text'
+
         us = UserSetting.get(id=user.id)
         if not us:
             us = UserSetting(id=user.id)
         if us.stats:
             us.cards_played += 1
             us.cards_beaten += 1
-    
-    # --- ASYNCHRONOUS BLOCK ---
-    
-    # Check for turn end conditions ("Бито!")
+
+    # --- CORRECT MESSAGE CLEANUP ---
+    # Clean up the specific message for the card that was just beaten.
+    announce_id = game.attack_announce_message_ids.pop(atk_card, None)
+    if announce_id:
+        try:
+            await bot.delete_message(game.chat.id, announce_id)
+        except Exception:
+            pass
+
+    if display_mode in ['text_and_sticker', 'sticker_and_button']:
+        sticker_id = game.attack_sticker_message_ids.pop(atk_card, None)
+        if sticker_id:
+            try:
+                await bot.delete_message(game.chat.id, sticker_id)
+            except Exception:
+                pass
+
+    # --- TURN END LOGIC ---
     if game.all_cards_beaten:
-        # Check if all attackers are done
         all_attackers_done = True
         passed_attackers = getattr(game, '_temp_passed_attackers', set())
         for p in game.attackers:
-            if p.id not in passed_attackers and p.can_add_to_field:
+            if p.user.id not in passed_attackers and p.can_add_to_field:
                 all_attackers_done = False
                 break
         
