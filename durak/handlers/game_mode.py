@@ -1,6 +1,6 @@
 from aiogram import types
 from aiogram.dispatcher.filters import Command
-from pony.orm import db_session
+from pony.orm import db_session, commit
 
 from durak.db.chat_settings import ChatSetting
 from durak.logic.utils import user_is_creator
@@ -16,23 +16,24 @@ async def set_game_mode(message: types.Message):
 
     reply_message = None
 
-    with db_session:
-        try:
-            game = gm.get_game_from_chat(message.chat)
-
+    try:
+        game = gm.get_game_from_chat(message.chat)
+        
+        with db_session:
             if not user_is_creator(user, game):
                 reply_message = "Тільки творець гри може змінювати її режим."
             else:
                 chat_setting = ChatSetting.get_or_create(chat_id=chat_id)
                 if not args:
                     current_mode = chat_setting.display_mode
+                    # FIX: Escaped < > to prevent CantParseEntities error
                     reply_message = (
                         f"Поточний режим гри: `{current_mode}`\n\n"
                         f"Доступні режими:\n"
                         f"• `text` — класичний текстовий режим\n"
                         f"• `text_and_sticker` — текст та стікери карт\n"
                         f"• `sticker_and_button` — стікери та кнопки (мінімалістично)\n\n"
-                        f"Щоб змінити режим, введіть: `/gamemode <назва_режиму>`"
+                        f"Щоб змінити режим, введіть: `/gamemode [назва_режиму]`"
                     )
                 else:
                     new_mode = args.lower()
@@ -41,12 +42,16 @@ async def set_game_mode(message: types.Message):
                         reply_message = f"✅ Режим гри змінено на `{new_mode}`"
                     else:
                         reply_message = "Невідомий режим. Доступні: `text`, `text_and_sticker`, `sticker_and_button`."
+            commit() # Commit any changes made within the session
 
-        except NoGameInChatError:
+    except NoGameInChatError:
+        with db_session:
             chat_setting = ChatSetting.get(id=chat_id)
             if chat_setting and chat_setting.is_game_active:
                 chat_setting.is_game_active = False  # Reset stale game state
-            reply_message = "Гра не створена в цьому чаті."
+                commit()
+        reply_message = "Гра не створена в цьому чаті."
 
     if reply_message:
-        await message.answer(reply_message)
+        # The await call is now outside the db_session block where modifications happen
+        await message.answer(reply_message, parse_mode='Markdown')
