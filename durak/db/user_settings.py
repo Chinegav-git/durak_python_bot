@@ -1,10 +1,8 @@
 from pony.orm import Optional, PrimaryKey
 from .database import db
-from .database import session
 
 
 class UserSetting(db.Entity):
-
     id = PrimaryKey(int, auto=False, size=64)  # Telegram User ID
     stats = Optional(bool, default=True)  # Opt-in to keep game statistics
     first_places = Optional(int, default=0)  # Nr. of games won in first place
@@ -12,3 +10,10 @@ class UserSetting(db.Entity):
     cards_played = Optional(int, default=0)  # Nr. of cards played total
     cards_beaten = Optional(int, default=0)  # Nr. of cards beaten total
     cards_atack = Optional(int, default=0)  # Nr. of cards atack total
+
+    @staticmethod
+    def get_or_create(user_id):
+        user_setting = UserSetting.get(id=user_id)
+        if not user_setting:
+            user_setting = UserSetting(id=user_id)
+        return user_setting
