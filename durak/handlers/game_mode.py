@@ -26,7 +26,6 @@ async def set_game_mode(message: types.Message):
                 chat_setting = ChatSetting.get_or_create(chat_id=chat_id)
                 if not args:
                     current_mode = chat_setting.display_mode
-                    # FIX: Escaped < > to prevent CantParseEntities error
                     reply_message = (
                         f"Поточний режим гри: `{current_mode}`\n\n"
                         f"Доступні режими:\n"
@@ -42,16 +41,18 @@ async def set_game_mode(message: types.Message):
                         reply_message = f"✅ Режим гри змінено на `{new_mode}`"
                     else:
                         reply_message = "Невідомий режим. Доступні: `text`, `text_and_sticker`, `sticker_and_button`."
-            commit() # Commit any changes made within the session
+            
+            # Commit changes and then send the reply within the same session
+            commit()
+            if reply_message:
+                await message.answer(reply_message, parse_mode='Markdown')
 
     except NoGameInChatError:
+        reply_message = "Гра не створена в цьому чаті."
         with db_session:
-            chat_setting = ChatSetting.get(id=chat_id)
+            chat_setting = ChatSetting.get(chat_id=chat_id)
             if chat_setting and chat_setting.is_game_active:
                 chat_setting.is_game_active = False  # Reset stale game state
                 commit()
-        reply_message = "Гра не створена в цьому чаті."
-
-    if reply_message:
-        # The await call is now outside the db_session block where modifications happen
-        await message.answer(reply_message, parse_mode='Markdown')
+            # Send reply within the session to avoid transaction errors
+            await message.answer(reply_message)
