@@ -20,6 +20,11 @@ async def user_is_creator_or_admin(user: User, game: Game, chat: Chat):
     return user_is_creator(user, game) or user_is_bot_admin(user) or (await user_is_admin(user, chat))
 
 
+async def user_can_change_gamemode(user: User, chat: Chat):
+    """Checks if a user can change the game mode (bot admin or chat admin)."""
+    return user_is_bot_admin(user) or (await user_is_admin(user, chat))
+
+
 async def get_admin_ids(chat_id: int):
     """Returns a list of admin IDs for a given chat."""
     bot = Bot.get_current()

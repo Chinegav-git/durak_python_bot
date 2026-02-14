@@ -18,7 +18,7 @@ async def start_inline_handler(callback_query: types.CallbackQuery):
         return
 
     if not (await user_is_creator_or_admin(user, game, chat)):
-        await bot.answer_callback_query(callback_query.id, '🚫 Ви не можете почати гру!')
+        await bot.answer_callback_query(callback_query.id, '🚫 Почати гру може лише її творець, адміністратор чату або адміністратор бота.')
         return
     try:
         # game start

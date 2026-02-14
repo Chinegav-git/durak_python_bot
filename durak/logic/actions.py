@@ -9,16 +9,17 @@ async def win(game: Game, player: Player):
     chat = game.chat
     bot = Bot.get_current()
     
-    # Perform all database operations first, outside of any async logic
+    # SYNCHRONOUS BLOCK: Perform all database operations first.
     with session:
         user = player.user
+        # Use get_or_create pattern
         us = UserSetting.get(id=user.id)
         if not us:
             us = UserSetting(id=user.id)
         if us.stats:
             us.first_places += 1  # first winner
 
-    # Now, perform async operations
+    # ASYNCHRONOUS BLOCK: Now, perform async operations.
     if not game.winner:
         game.winner = player
         await bot.send_message(chat.id, f'🏆 ({player.user.get_mention(as_html=True)}) - переможець!')
@@ -28,10 +29,6 @@ async def win(game: Game, player: Player):
 
 
 async def do_turn(game: Game, skip_def: bool = False):
-    """
-    Handles the turn transition, checks for winners, and ends the game if necessary.
-    This function is the heart of the game flow control.
-    """
     chat = game.chat
     bot = Bot.get_current()
 
@@ -40,7 +37,7 @@ async def do_turn(game: Game, skip_def: bool = False):
             if gm.get_game_from_chat(chat):
                 winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in game.winners])
                 losers_text = "\n".join([f'💔 {p.user.get_mention(as_html=True)}' for p in game.players])
-                gm.end_game(game.chat) # End game before sending message
+                gm.end_game(game.chat)
                 await bot.send_message(
                     chat.id,
                     f'🎮 Гру закінчено!\n\n'
@@ -103,17 +100,14 @@ async def do_leave_player(player: Player, from_turn: bool = False):
         game.players.remove(player)
         return
     
-    try:
-        with session:
-            user = player.user
-            us = UserSetting.get(id=user.id)
-            if not us:
-                us = UserSetting(id=user.id)
-            if us.stats:
-                us.games_played += 1
-    except Exception as e:
-        import logging
-        logging.error(f"[actions] [stat_leave_+] [Error]: {e}")
+    # SYNCHRONOUS BLOCK
+    with session:
+        user = player.user
+        us = UserSetting.get(id=user.id)
+        if not us:
+            us = UserSetting(id=user.id)
+        if us.stats:
+            us.games_played += 1
     
     index = game.players.index(player)
 
@@ -131,6 +125,7 @@ async def do_leave_player(player: Player, from_turn: bool = False):
     if len(game.players) <= 1:
         raise NotEnoughPlayersError
     
+    # ASYNCHRONOUS BLOCK
     if player in [current, opponent] and not from_turn:
         await do_turn(game)
 
@@ -162,14 +157,14 @@ async def do_draw(player: Player):
     game = player.game
     bot = Bot.get_current()
     
-    # First, get settings from DB
+    # SYNCHRONOUS BLOCK: Get settings from DB.
+    display_mode = 'text'
     with session:
         cs = ChatSetting.get(id=game.chat.id)
-        if not cs:
-            cs = ChatSetting(id=game.chat.id)
-        display_mode = cs.display_mode
+        if cs:
+            display_mode = cs.display_mode
 
-    # Now, perform async operations
+    # ASYNCHRONOUS BLOCK: Now, perform async operations.
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
         for sticker_message_id in game.attack_sticker_message_ids.values():
             try:
@@ -182,105 +177,85 @@ async def do_draw(player: Player):
 
 
 async def do_attack_card(player: Player, card: Card):
-    player.play_attack(card)
     game = player.game
     user = player.user
     bot = Bot.get_current()
-    
-    # --- DB Block ---
-    with session:
-        # Inlined get_or_create for ChatSetting
-        cs = ChatSetting.get(id=game.chat.id)
-        if not cs:
-            cs = ChatSetting(id=game.chat.id)
-        display_mode = cs.display_mode
 
-        # Inlined get_or_create for UserSetting
+    # First, apply game logic changes
+    player.play_attack(card)
+    
+    # SYNCHRONOUS BLOCK
+    display_mode = 'text'
+    with session:
+        cs = ChatSetting.get(id=game.chat.id)
+        if cs:
+            display_mode = cs.display_mode
+
         us = UserSetting.get(id=user.id)
         if not us:
             us = UserSetting(id=user.id)
         if us.stats:
             us.cards_played += 1
             us.cards_atack += 1
-    # --- End of DB Block ---
     
     if not player.cards:
         game.is_pass = True
         if len(game.players) <= 2 and not game.deck.cards:
             game.is_final = True
 
-    # --- Async Block ---
-    try:
-        if display_mode == 'text':
-            beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
-            msg = await bot.send_message(
-                game.chat.id,
-                f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}",
-                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=beat),
-            )
-            game.attack_announce_message_ids[card] = msg.message_id
-        elif display_mode == 'text_and_sticker':
-            sticker_msg = await bot.send_sticker(game.chat.id, card.sticker_id)
-            game.attack_sticker_message_ids[card] = sticker_msg.message_id
+    # ASYNCHRONOUS BLOCK
+    beat_markup = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]
+    ])
 
-            beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
-            msg = await bot.send_message(
-                game.chat.id,
-                f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}",
-                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=beat),
-            )
-            game.attack_announce_message_ids[card] = msg.message_id
-        elif display_mode == 'sticker_and_button':
-            sticker_msg = await bot.send_sticker(game.chat.id, card.sticker_id)
-            game.attack_sticker_message_ids[card] = sticker_msg.message_id
+    sticker_msg = None
+    if display_mode in ['text_and_sticker', 'sticker_and_button']:
+        sticker_msg = await bot.send_sticker(game.chat.id, card.sticker_id)
+        game.attack_sticker_message_ids[card] = sticker_msg.message_id
 
-            beat = [[types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]]
-            msg = await bot.send_message(
-                game.chat.id,
-                "​",
-                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=beat),
-            )
-            game.attack_announce_message_ids[card] = msg.message_id
+    text = "​"  # Zero-width space for sticker_and_button mode
+    if display_mode in ['text', 'text_and_sticker']:
+        text = f"⚔️ <b>{user.get_mention(as_html=True)}</b>\nпідкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}"
 
-    except Exception:
-        pass
+    msg = await bot.send_message(
+        game.chat.id,
+        text,
+        reply_markup=beat_markup
+    )
+    game.attack_announce_message_ids[card] = msg.message_id
 
             
 async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
-    player.play_defence(atk_card, def_card)
     game = player.game
     user = player.user
     bot = Bot.get_current()
-    
-    # --- DB Block ---
-    with session:
-        # Inlined get_or_create for ChatSetting
-        cs = ChatSetting.get(id=game.chat.id)
-        if not cs:
-            cs = ChatSetting(id=game.chat.id)
-        display_mode = cs.display_mode
 
-        # Inlined get_or_create for UserSetting
+    # First, apply game logic changes
+    player.play_defence(atk_card, def_card)
+    
+    # SYNCHRONOUS BLOCK
+    display_mode = 'text'
+    with session:
+        cs = ChatSetting.get(id=game.chat.id)
+        if cs:
+            display_mode = cs.display_mode
+
         us = UserSetting.get(id=user.id)
         if not us:
             us = UserSetting(id=user.id)
-        
         if us.stats:
             us.cards_played += 1
             us.cards_beaten += 1
-    # --- End of DB Block ---
     
-    if game.all_beaten_cards and len(game.players) == 2 and not game.attacker_can_continue:
+    # --- ASYNCHRONOUS BLOCK ---
+    # Check for turn end conditions first
+    if (game.all_beaten_cards and len(game.players) == 2 and not game.attacker_can_continue) or \
+       (game.all_beaten_cards and game.is_pass):
         await do_turn(game)
         return
 
-    if game.all_beaten_cards and game.is_pass:
-        await do_turn(game)
-        return
-
+    # Clean up messages from the attack phase
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)
-    
-    # --- ASYNC Block ---
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
         sticker_id = game.attack_sticker_message_ids.pop(atk_card, None)
         if sticker_id:
@@ -289,22 +264,22 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
             except Exception:
                 pass
 
-    async def _delete_later(chat_id: int, message_id: int):
-        await asyncio.sleep(7)
-        try:
-            await bot.delete_message(chat_id=chat_id, message_id=message_id)
-        except Exception:
-            pass
-
     if announce_id:
+        # Schedule deletion of the original attack message
+        async def _delete_later(chat_id: int, message_id: int):
+            await asyncio.sleep(7)
+            try:
+                await bot.delete_message(chat_id=chat_id, message_id=message_id)
+            except Exception:
+                pass
         asyncio.create_task(_delete_later(game.chat.id, announce_id))
 
-    try:
-        toss_more = [[types.InlineKeyboardButton(text='↪️ Підкинути ще', switch_inline_query_current_chat='')]]
-        await bot.send_message(
-            game.chat.id,
-            f"🛡️ <b>{user.get_mention(as_html=True)}</b> побив(ла) карту {str(atk_card)} картою {str(def_card)}",
-            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=toss_more),
-        )
-    except Exception:
-        pass
+    # Send confirmation message
+    toss_more_markup = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(text='↪️ Підкинути ще', switch_inline_query_current_chat='')]
+    ])
+    await bot.send_message(
+        game.chat.id,
+        f"🛡️ <b>{user.get_mention(as_html=True)}</b> побив(ла) карту {str(atk_card)} картою {str(def_card)}",
+        reply_markup=toss_more_markup,
+    )

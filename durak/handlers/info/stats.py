@@ -1,52 +1,58 @@
 from aiogram import types
-from durak.db import UserSetting, session
+from durak.db import UserSetting
 from loader import bot, dp, Commands
+from pony.orm import db_session
 
+def _get_user_stats(user_id):
+    with db_session:
+        us = UserSetting.get(id=user_id)
+        if not us:
+            # Create a new setting if it doesn't exist, but don't save it yet
+            return UserSetting(id=user_id)
+        return us
+
+def _toggle_stats(user_id, status):
+    with db_session:
+        us = UserSetting.get(id=user_id)
+        if not us:
+            us = UserSetting(id=user_id)
+        us.stats = status
 
 @dp.message_handler(commands=[Commands.STATS])
 async def my_stats_handler(message: types.Message):
     user = types.User.get_current()
     
-    with session as s:
-        us = UserSetting.get(id=user.id)
-        if not us:
-            us = UserSetting(id=user.id)
+    # SYNCHRONOUS BLOCK
+    us = _get_user_stats(user.id)
 
     stat_status = "✅" if us.stats else "❌"
     
-    f"{stat_status} <b>Ваша статистика:</b>\n"
-
     p = round((us.first_places / us.games_played) * 100) if us.games_played else 0
     
+    # ASYNCHRONOUS BLOCK
     await message.answer(f"<u>{stat_status} <b>Ваша статистика:</b></u>\n"
-                         f"- Победы: {us.first_places} / {us.games_played}   ({p}%)\n"
-                         f"- Кол-во атак: {us.cards_played}\n"
-                         f"- Кол-во защит: {us.cards_beaten}")
+                         f"- Перемоги: {us.first_places} / {us.games_played}   ({p}%)\n"
+                         f"- Кількість атак: {us.cards_played}\n"
+                         f"- Кількість відбиттів: {us.cards_beaten}")
     
 
 @dp.message_handler(commands=[Commands.OFF_STATS])
 async def off_stats_handler(message: types.Message):
     user = types.User.get_current()
     
-    with session as s:
-        us = UserSetting.get(id=user.id)
-        if not us:
-            us = UserSetting(id=user.id)
-
-        us.stats = False
+    # SYNCHRONOUS BLOCK
+    _toggle_stats(user.id, False)
         
-    await message.answer(f"<b>Сбор статистики приостановлен!</b>\n<i>Возобновить</i> - /{Commands.ON_STATS}")
+    # ASYNCHRONOUS BLOCK
+    await message.answer(f"<b>Збір статистики припинено!</b>\n<i>Відновити</i> - /{Commands.ON_STATS}")
     
     
 @dp.message_handler(commands=[Commands.ON_STATS])
 async def on_stats_handler(message: types.Message):
     user = types.User.get_current()
     
-    with session as s:
-        us = UserSetting.get(id=user.id)
-        if not us:
-            us = UserSetting(id=user.id)
+    # SYNCHRONOUS BLOCK
+    _toggle_stats(user.id, True)
         
-        us.stats = True
-        
-    await message.answer(f"<b>Сбор статистики возобновлён!</b>\n<i>Приостановить</i> - /{Commands.OFF_STATS}")
+    # ASYNCHRONOUS BLOCK
+    await message.answer(f"<b>Збір статистики відновлено!</b>\n<i>Припинити</i> - /{Commands.OFF_STATS}")

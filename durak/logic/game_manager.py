@@ -16,31 +16,48 @@ class GameManager:
     def set_bot(self, bot: Bot):
         self.bot = bot
 
+    # --- DB-related private methods ---
+
     @db_session
+    def _new_game_db_session(self, chat_id: int):
+        """Synchronously handles DB operations for new game creation."""
+        chat_setting = ChatSetting.get_or_create(chat_id)
+        if chat_setting.is_game_active:
+            # If game is marked active but not in memory, it's a stale game from a restart.
+            chat_setting.is_game_active = False
+        chat_setting.is_game_active = True
+
+    @db_session
+    def _end_game_db_session(self, chat_id: int, players: List[Player]):
+        """Synchronously handles DB operations for ending a game."""
+        # Update chat state
+        chat_setting = ChatSetting.get(id=chat_id)
+        if chat_setting:
+            chat_setting.is_game_active = False
+
+        # Update player stats
+        for pl in players:
+            us = UserSetting.get_or_create(pl.user.id)
+            if us.stats:
+                us.games_played += 1
+
+    # --- Public methods ---
+
     def new_game(self, chat: types.Chat, creator: types.User) -> Game:
         """
         Створює нову гру, забезпечуючи стійкість до перезапусків.
         errors:
         - GameAlreadyInChatError (якщо гра вже є в пам'яті)
         """
-        # 1. Перевірка наявності гри в пам'яті
         if self.games.get(chat.id):
             raise GameAlreadyInChatError
 
-        # 2. Отримання або створення налаштувань чату та перевірка "завислої" гри
-        chat_setting = ChatSetting.get_or_create(chat.id)
-        if chat_setting.is_game_active:
-            # Якщо гра позначена як активна в БД, але її немає в пам'яті,
-            # це означає, що бот перезапускався. Скидаємо стан.
-            chat_setting.is_game_active = False
+        # Handle DB operations in an isolated, synchronous session
+        self._new_game_db_session(chat.id)
 
-        # 3. Створення нової гри та збереження її в пам'яті
+        # Create the new game in memory
         game = Game(chat, creator)
         self.games[chat.id] = game
-
-        # 4. Позначення гри як активної в базі даних
-        chat_setting.is_game_active = True
-
         return game
 
     def get_game_from_chat(self, chat: types.Chat) -> Game:
@@ -52,30 +69,23 @@ class GameManager:
             return game
         raise NoGameInChatError
 
-    @db_session
     def end_game(self, target: Union[types.Chat, Game]) -> None:
-        """errors:
+        """
+        errors:
         - NoGameInChatError
         """
         chat_id = target.chat.id if isinstance(target, Game) else target.id
 
-        # Видалення гри з пам'яті
+        # In-memory operation
         game = self.games.pop(chat_id, None)
 
-        # Завжди оновлюємо стан в БД
-        chat_setting = ChatSetting.get(id=chat_id)
-        if chat_setting:
-            chat_setting.is_game_active = False
+        # Handle DB operations, even if the game was not in memory (for consistency)
+        players = game.players if game else []
+        self._end_game_db_session(chat_id, players)
 
-        # Якщо гри не було в пам'яті, кидаємо помилку
+        # If the game was not in memory, still raise an error as per original logic
         if game is None:
             raise NoGameInChatError
-        
-        # Оновлення статистики гравців
-        for pl in game.players:
-            us = UserSetting.get_or_create(pl.user.id)
-            if us.stats:
-                us.games_played += 1
 
     async def test_win_game(self, game: Game, winner_id: int):
         """
