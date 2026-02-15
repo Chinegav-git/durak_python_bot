@@ -1,17 +1,25 @@
 from aiogram import types
-from typing import List
+from typing import List, Optional
 
 from loader import bot, dp, gm, CHOISE
 from durak.objects import *
 from durak.logic import result as r
 
+def get_player_for_user(user: types.User) -> Optional[Player]:
+    """Finds the player object for a given user across all active games."""
+    for game in gm.games.values():
+        for player in game.players:
+            if player.user.id == user.id:
+                return player
+    return None
+
 
 @dp.inline_handler()
 async def inline_handler(query: types.InlineQuery):
-    ''' Inline handler :> '''
+    """ Inline handler :> """
     user = types.User.get_current()
     text = query.query or ''
-    player = gm.player_for_user(user)
+    player = get_player_for_user(user)
     result: List[types.InlineQueryResult] = []
     if player is None:
         # not playing
