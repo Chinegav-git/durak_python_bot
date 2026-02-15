@@ -1,9 +1,8 @@
 from aiogram import types
 
 from loader import bot, dp, gm, CHOISE
-from durak.objects import *
+from durak.objects import * # This will import NoGameInChatError from durak.objects.errors
 from durak.logic import actions, result
-from durak.logic.exceptions import NoGameInChatError
 
 
 async def send_cheat_att(player: Player):

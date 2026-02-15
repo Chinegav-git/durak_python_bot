@@ -1,5 +1,10 @@
 # Історія змін
 
+## [1.2.37] - 2024-06-07
+
+### Fixed
+- **Критична помилка `ModuleNotFoundError`:** Виправлено помилку `ModuleNotFoundError: No module named 'durak.logic.exceptions'`, яка виникала при запуску бота. Помилка була спричинена неправильним імпортом `NoGameInChatError` у файлі `durak/handlers/game/process_chosen.py`. Некоректний імпорт було видалено, що відновило працездатність програми.
+
 ## [1.2.36] - 2024-06-07
 
 ### Fixed
