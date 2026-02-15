@@ -120,13 +120,20 @@ class Player:
 
 
     def can_beat(self, atk_card: Card, def_card: Card) -> bool:
+        # Convert card values to integers for correct comparison
+        def_card_value = int(def_card.value)
+        atk_card_value = int(atk_card.value)
+
         if def_card.suit == self.game.trump:
-            return ( atk_card.suit != self.game.trump ) or ( def_card.value > atk_card.value )
+            # A trump card can beat any non-trump, or a lower-ranking trump
+            return (atk_card.suit != self.game.trump) or (def_card_value > atk_card_value)
         
-        elif ( def_card.suit == atk_card.suit ):
-            return def_card.value > atk_card.value
+        elif def_card.suit == atk_card.suit:
+            # A non-trump card can only beat a lower-ranking card of the same suit
+            return def_card_value > atk_card_value
         
         else:
+            # Different non-trump suits cannot beat each other
             return False
 
 
