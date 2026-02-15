@@ -1,8 +1,18 @@
 from aiogram import types
+from typing import Optional
 
 from loader import bot, dp, gm
 from durak.objects import * # This will import NoGameInChatError from durak.objects.errors
 from durak.logic import actions, result
+
+
+def get_player_for_user(user: types.User) -> Optional[Player]:
+    """Finds the player object for a given user across all active games."""
+    for game in gm.games.values():
+        for player in game.players:
+            if player.user.id == user.id:
+                return player
+    return None
 
 
 async def send_cheat_att(player: Player):
@@ -18,7 +28,7 @@ async def send_cheat_att(player: Player):
 async def result_handler(query: types.ChosenInlineResult):
     ''' Inline process '''
     user = types.User.get_current()
-    player = gm.player_for_user(user)
+    player = get_player_for_user(user)
 
     if player is None:
         return
