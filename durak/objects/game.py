@@ -30,11 +30,12 @@ class Game:
         self.attacker_index: int = 0
         self.winner: Player | None = None
         self.durak: Player | None = None
-        self.is_pass: bool = False
         self.is_final: bool = False
 
         self.attack_announce_message_ids: Dict[Card, int] = {}
         self.attack_sticker_message_ids: Dict[Card, int] = {}
+        
+        self._temp_passed_attackers: set[int] = set()
 
         self.COUNT_CARDS_IN_START: int = Config.COUNT_CARDS_IN_START
         self.MAX_PLAYERS: int = Config.MAX_PLAYERS
@@ -74,9 +75,6 @@ class Game:
         self.started = True
         self.take_cards_from_deck()
 
-    def rotate_players(self, lst: List[Player], index: int) -> List[Player]:
-        return lst[index:] + lst[:index]
-
     @property
     def attacking_cards(self) -> List[Card]:
         return list(filter(bool, self.field.keys()))
@@ -86,71 +84,77 @@ class Game:
         return list(filter(bool, self.field.values()))
 
     @property
-    def any_unbeaten_card(self) -> bool:
-        return any(c is None for c in self.field.values())
-
-    @property
     def all_beaten_cards(self) -> bool:
-        return all(c is not None for c in self.field.values())
+        # Returns True if the field is not empty and all attacking cards have a defending card.
+        return bool(self.field) and all(c is not None for c in self.field.values())
 
     @property
     def current_player(self) -> Player:
+        """ The main attacker in the current turn """
         return self.players[self.attacker_index]
 
     @property
     def opponent_player(self) -> Optional[Player]:
-        for i in range(1, len(self.players)):
-            opponent_index = (self.attacker_index + i) % len(self.players)
-            player = self.players[opponent_index]
-            if not player.finished_game:
-                return player
-        return None
-
-    @property
-    def support_player(self) -> Optional[Player]:
+        """ The player who is defending in the current turn """
         active_players = [p for p in self.players if not p.finished_game]
-        if len(active_players) < 3:
+        if len(active_players) < 2:
             return None
-
-        opponent = self.opponent_player
-        if not opponent: return None
-
-        for i in range(1, len(active_players)):
-            try:
-                base_index = active_players.index(opponent)
-                support_index = (base_index + i) % len(active_players)
-                supporter = active_players[support_index]
-                if supporter != self.current_player:
-                    return supporter
-            except ValueError:
-                return None
-        return None
-
+        
+        current_idx_in_active = active_players.index(self.current_player)
+        opponent_idx_in_active = (current_idx_in_active + 1) % len(active_players)
+        return active_players[opponent_idx_in_active]
+    
     @property
-    def allow_support_attack(self) -> bool:
-        return len(self.attacking_cards) < self.COUNT_CARDS_IN_START
+    def attackers(self) -> List[Player]:
+        """ The list of all players who can attack in this turn """
+        main_attacker = self.current_player
+        defender = self.opponent_player
+        if not defender:
+            return [main_attacker]
+        
+        potential_attackers = [p for p in self.players if p != defender and not p.finished_game]
+        if not self.field: # First attack of the turn
+            return [main_attacker]
+
+        attackers = {main_attacker}
+        field_ranks = {c.value for c in self.attacking_cards} | {c.value for c in self.defending_cards if c}
+
+        for player in potential_attackers:
+            if player == main_attacker: continue
+            if any(card.value in field_ranks for card in player.cards):
+                attackers.add(player)
+
+        return list(attackers)
 
     @property
     def allow_atack(self) -> bool:
+        """ Checks if an attack is generally allowed (card limits) """
         opponent = self.opponent_player
-        if not opponent:
+        if not opponent or not opponent.cards:
             return False
+        
         return len(self.attacking_cards) < self.COUNT_CARDS_IN_START and \
-            len(self.attacking_cards) < len(opponent.cards)
+               len(self.attacking_cards) < len(opponent.cards)
 
     @property
     def attacker_can_continue(self) -> bool:
+        """ Checks if the MAIN attacker has any valid card to continue the attack """
         attacker = self.current_player
         if not attacker.cards or not self.allow_atack:
             return False
+        
         field_values = {c.value for c in self.attacking_cards}
         field_values.update({c.value for c in self.defending_cards if c})
+        
         if not field_values:
             return True
+            
         return any(card.value in field_values for card in attacker.cards)
 
     def attack(self, card: Card) -> None:
         self.field[card] = None
+        # Any attack action resets the pass state for the attacker
+        self._temp_passed_attackers.discard(self.current_player.user.id)
 
     def defend(self, attacking_card: Card, defending_card: Card) -> None:
         self.field[attacking_card] = defending_card
@@ -163,6 +167,7 @@ class Game:
         self.field.clear()
         self.attack_announce_message_ids.clear()
         self.attack_sticker_message_ids.clear()
+        self._temp_passed_attackers.clear()
 
     def take_all_field(self) -> None:
         opponent = self.opponent_player
@@ -175,27 +180,29 @@ class Game:
         self._clear_field()
 
     def take_cards_from_deck(self) -> None:
-        players_in_turn = self.rotate_players(self.players, self.attacker_index)
-        active_players_in_turn = [p for p in players_in_turn if not p.finished_game]
-
-        for player in active_players_in_turn:
+        # Simplified: all active players draw up to the required count.
+        # The order is less critical here than for turn switching.
+        active_players = [p for p in self.players if not p.finished_game]
+        for player in active_players:
             player.draw_cards_from_deck()
 
     def turn(self, skip_def: bool = False) -> None:
         self.logger.debug(f"Switching turn. Skip defender: {skip_def}")
         
-        if not skip_def:
-            start_index_base = self.players.index(self.opponent_player) if self.opponent_player else self.attacker_index
-            
-            for i in range(1, len(self.players) + 1):
-                next_index = (start_index_base + i) % len(self.players)
-                if not self.players[next_index].finished_game:
-                    self.attacker_index = next_index
-                    break
-            else:
-                self.logger.warning("No active player found to continue.")
+        active_players = [p for p in self.players if not p.finished_game]
+        if len(active_players) < 2:
+            return
 
-        self.is_pass = False
+        current_attacker_active_idx = active_players.index(self.current_player)
+
+        if not skip_def:  # Normal turn: defender becomes attacker
+            next_attacker_active_idx = (current_attacker_active_idx + 1) % len(active_players)
+        else:  # Defender took cards, skip them: next is after defender
+            next_attacker_active_idx = (current_attacker_active_idx + 2) % len(active_players)
+        
+        next_attacker = active_players[next_attacker_active_idx]
+        self.attacker_index = self.players.index(next_attacker)
+
         self._clear_field()
         self.take_cards_from_deck()
         if not self.current_player.finished_game:
