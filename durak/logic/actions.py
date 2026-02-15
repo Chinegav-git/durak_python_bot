@@ -173,7 +173,7 @@ async def do_draw(player: Player):
     
     text = (
         f'↪️ <b>Хід залишається</b>\n\n'
-        f'{taking_player.user.get_mention(as_html=True)} бере карти.\n'
+        f'🫳 {taking_player.user.get_mention(as_html=True)} бере карти.\n'
         f'⚔️ Атакує: {attacker.user.get_mention(as_html=True)} (🃏{len(attacker.cards)})\n'
         f'🛡️ Захищається: {defender.user.get_mention(as_html=True)} (🃏{len(defender.cards)})\n\n'
         f'🃏 Козир: {game.deck.trump_ico}\n'
