@@ -2,7 +2,7 @@
 import asyncio
 from aiogram import types, Bot
 
-from loader import gm
+from loader import gm, CHOISE
 from ..db import ChatSetting, UserSetting, session
 from ..objects import *
 from ..objects import card as c
@@ -38,7 +38,8 @@ async def send_turn_notification(game: Game):
         f'♦️ Козир: {game.deck.trump_ico}\n'
         f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
-    await bot.send_message(game.chat.id, text)
+    reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
+    await bot.send_message(game.chat.id, text, reply_markup=reply_markup)
 
 
 async def win(game: Game, player: Player):
@@ -178,7 +179,8 @@ async def do_draw(player: Player):
         f'♦️ Козир: {game.deck.trump_ico}\n'
         f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
-    await bot.send_message(game.chat.id, text)
+    reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
+    await bot.send_message(game.chat.id, text, reply_markup=reply_markup)
 
 
 async def do_attack_card(player: Player, card: Card):

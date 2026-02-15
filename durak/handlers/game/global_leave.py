@@ -2,33 +2,45 @@ from aiogram import types
 from loader import bot, dp, gm, Commands
 import durak.logic.actions as a
 from durak.objects import *
-
+from pony.orm import db_session
 
 @dp.message_handler(commands=[Commands.GLEAVE], chat_type=['group', 'supergroup'])
-async def leave_handler(message: types.Message):
-    ''' Global leave in a game '''
+async def global_leave_handler(message: types.Message):
+    """ Global leave from any game """
     user = types.User.get_current()
     
-    player = gm.player_for_user(user)
+    player_to_leave = None
+    game_to_leave = None
 
-    if player is None:
-        await message.answer('🚫 Ви не граєте!')
+    # Find the player and game across all active games
+    for game in gm.games.values():
+        for player in game.players:
+            if player.user.id == user.id:
+                player_to_leave = player
+                game_to_leave = game
+                break
+        if game_to_leave:
+            break
+
+    if not player_to_leave or not game_to_leave:
+        await message.answer('🚫 Ви не граєте в жодній грі!')
         return
     
-    game = player.game
     mention = user.get_mention(as_html=True)
 
     try:
-        # kick player (leave)
-        await a.do_leave_player(player)
+        # The action now correctly updates the DB
+        await a.do_leave_player(player_to_leave)
+        await message.answer(f'👋 ({mention}) - Ви успішно покинули гру в іншому чаті!')
+
     except NotEnoughPlayersError:
-        gm.end_game(game.chat)
-        await bot.send_message(game.chat.id, f'👋 ({mention}) - Покинув(ла) гру!')
-        await bot.send_message(game.chat.id, '🎮 Гра завершена!\n')
+        # end_game handles all cleanup
+        gm.end_game(game_to_leave)
+        await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) гру!')
+        await bot.send_message(game_to_leave.chat.id, '🎮 Гра завершена, оскільки не залишилося гравців!')
+        await message.answer(f'👋 ({mention}) - Ви успішно покинули гру в іншому чаті, і вона була завершена.')
     else:
-        if game.started:
-            await bot.send_message(game.chat.id, f'👋 ({mention}) - Покинув(ла) гру\n🎯 Хід робить гравець {game.current_player.user.get_mention(as_html=True)}')
+        if game_to_leave.started:
+            await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) гру\n🎯 Хід робить гравець {game_to_leave.current_player.user.get_mention(as_html=True)}')
         else:
-            await bot.send_message(game.chat.id, f'👋 ({mention}) - Покинув(ла) лобі!')
-    
-    await message.answer(f'👋 ({mention}) - Покинув(ла) гру в іншому чаті!')
+            await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) лобі!')

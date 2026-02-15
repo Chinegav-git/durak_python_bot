@@ -1,6 +1,6 @@
 from aiogram import types
 
-from loader import bot, dp, gm, CHOISE
+from loader import bot, dp, gm
 from durak.objects import * # This will import NoGameInChatError from durak.objects.errors
 from durak.logic import actions, result
 
@@ -25,7 +25,6 @@ async def result_handler(query: types.ChosenInlineResult):
 
 
     game = player.game
-    field_old = game.field
     result_id = query.result_id
     chat = game.chat
 
@@ -38,9 +37,6 @@ async def result_handler(query: types.ChosenInlineResult):
     split_result_id = result_id.split('-')
     last_anti_cheat = player.anti_cheat
     player.anti_cheat += 1
-
-    current = game.current_player
-    opponent = game.opponent_player
 
 
     if result_id.startswith('mode_'):
@@ -159,35 +155,3 @@ async def result_handler(query: types.ChosenInlineResult):
         await bot.send_message(chat.id, result.get_result(game))
         gm.end_game(chat)
         return
-
-    try:
-        gm.get_game_from_chat(chat)
-    except NoGameInChatError:
-        return
-    else:
-        if game.field != field_old or game.current_player != current:
-            if game.current_player == current:
-                text = (
-                    f'✅ <b>Хід залишається!</b>\n\n'
-                    f'⚔️ <b>Атакує:</b> {game.current_player.user.get_mention(as_html=True)} 🃏 {len(game.current_player.cards)} карт\n'
-                    f'🛡️ <b>Захищається:</b> {game.opponent_player.user.get_mention(as_html=True)} 🃏 {len(game.opponent_player.cards)} карт\n'
-                    f'🎯 <b>Козир:</b> {game.deck.trump_ico} | 📦 <b>В колоді:</b> {len(game.deck.cards)} карт'
-                )
-            else:
-                text = (
-                    f'🔄 <b>Перехід ходу!</b>\n\n'
-                    f'⚔️ <b>Атакує:</b> {game.current_player.user.get_mention(as_html=True)} 🃏 {len(game.current_player.cards)} карт\n'
-                    f'🛡️ <b>Захищається:</b> {game.opponent_player.user.get_mention(as_html=True)} 🃏 {len(game.opponent_player.cards)} карт\n'
-                    f'🎯 <b>Козир:</b> {game.deck.trump_ico} | 📦 <b>В колоді:</b> {len(game.deck.cards)} карт'
-                )
-
-            if query.inline_message_id:
-                try:
-                    await bot.edit_message_reply_markup(
-                        inline_message_id=query.inline_message_id,
-                        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE),
-                    )
-                except Exception:
-                    await bot.send_message(chat.id, text, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE))
-            else:
-                await bot.send_message(chat.id, text, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE))

@@ -19,12 +19,13 @@ class GameManager:
     # --- DB-related private methods ---
 
     @db_session
-    def _new_game_db_session(self, chat_id: int):
+    def _new_game_db_session(self, chat_id: int, user_id: int):
         """Synchronously handles DB operations for new game creation."""
         chat_setting = ChatSetting.get_or_create(chat_id)
         if chat_setting.is_game_active:
-            chat_setting.is_game_active = False
+            chat_setting.is_game_active = False # Reset in case of zombie game
         chat_setting.is_game_active = True
+        self._update_user_playing_status_db_session([user_id], True)
 
     @db_session
     def _end_game_db_session(self, chat_id: int, players: List[Player]):
@@ -33,10 +34,26 @@ class GameManager:
         if chat_setting:
             chat_setting.is_game_active = False
 
+        player_ids = [p.user.id for p in players]
+        self._update_user_playing_status_db_session(player_ids, False)
+
         for pl in players:
             us = UserSetting.get_or_create(pl.user.id)
             if us.stats:
                 us.games_played += 1
+
+    @db_session
+    def _check_user_in_game_db_session(self, user_id: int) -> bool:
+        """Checks if a user is marked as playing in the database."""
+        user_setting = UserSetting.get(id=user_id)
+        return user_setting and user_setting.is_playing
+
+    @db_session
+    def _update_user_playing_status_db_session(self, user_ids: List[int], is_playing: bool):
+        """Updates the is_playing status for a list of users."""
+        for user_id in user_ids:
+            user_setting = UserSetting.get_or_create(user_id)
+            user_setting.is_playing = is_playing
 
     # --- Game Logic Helpers ---
 
@@ -68,7 +85,10 @@ class GameManager:
     def new_game(self, chat: types.Chat, creator: types.User) -> Game:
         if self.games.get(chat.id):
             raise GameAlreadyInChatError
-        self._new_game_db_session(chat.id)
+        if self._check_user_in_game_db_session(creator.id):
+            raise AlreadyJoinedInGlobalError
+
+        self._new_game_db_session(chat.id, creator.id)
         game = Game(chat, creator)
         self.games[chat.id] = game
         return game
@@ -86,6 +106,7 @@ class GameManager:
             players = game.players
             self._end_game_db_session(chat_id, players)
         else:
+            # If no game object, at least mark the chat as not having an active game
             self._end_game_db_session(chat_id, [])
             raise NoGameInChatError
 
@@ -127,9 +148,10 @@ class GameManager:
             raise LimitPlayersInGameError
         if any(p.user.id == user.id for p in game.players):
             raise AlreadyJoinedError
-        if self.check_user_ex_in_all_games(user):
+        if self._check_user_in_game_db_session(user.id):
             raise AlreadyJoinedInGlobalError
-        
+
+        self._update_user_playing_status_db_session([user.id], True)
         player = Player(game, user)
         game.players.append(player)
 
@@ -138,10 +160,11 @@ class GameManager:
             raise GameStartedError
         if len(game.players) <= 1:
             raise NotEnoughPlayersError
+
+        # Mitigate the original bug's consequences
+        unique_player_ids = {p.user.id for p in game.players}
+        if len(unique_player_ids) != len(game.players):
+            self.end_game(game)
+            raise Exception("Критична помилка: виявлено дублювання гравців. Гру було скасовано.")
+
         game.start()
-
-    def player_for_user(self, user: types.User) -> Player | None:
-        return next((p for g in self.games.values() for p in g.players if p.user.id == user.id), None)
-
-    def check_user_ex_in_all_games(self, user: types.User) -> bool:
-        return self.player_for_user(user) is not None

@@ -5,6 +5,7 @@ from .database import db
 class UserSetting(db.Entity):
     id = PrimaryKey(int, auto=False, size=64)  # Telegram User ID
     stats = Optional(bool, default=True)  # Opt-in to keep game statistics
+    is_playing = Optional(bool, default=False) # Is user currently in any game
     first_places = Optional(int, default=0)  # Nr. of games won in first place
     games_played = Optional(int, default=0)  # Nr. of games completed
     cards_played = Optional(int, default=0)  # Nr. of cards played total
