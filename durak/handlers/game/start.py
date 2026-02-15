@@ -40,7 +40,7 @@ async def start_handler(message: types.Message):
             f'🎯 <b>Початок раунду</b>\n\n'
             f'⚔️ Атакує: {current.user.get_mention(as_html=True)} (🃏{len(current.cards)})\n'
             f'🛡️ Захищається: {opponent.user.get_mention(as_html=True)} (🃏{len(opponent.cards)})\n\n'
-            f'♦️ Козир: {game.deck.trump_ico}\n'
+            f'🃏 Козир: {game.deck.trump_ico}\n'
             f'🃏 В колоді: {len(game.deck.cards)} карт'
         )
         await message.answer(text, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE))

@@ -35,7 +35,7 @@ async def send_turn_notification(game: Game):
         f'✅ <b>Перехід ходу</b>\n\n'
         f'⚔️ Атакує: {attacker.user.get_mention(as_html=True)} (🃏{len(attacker.cards)})\n'
         f'🛡️ Захищається: {defender.user.get_mention(as_html=True)} (🃏{len(defender.cards)})\n\n'
-        f'♦️ Козир: {game.deck.trump_ico}\n'
+        f'🃏 Козир: {game.deck.trump_ico}\n'
         f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
     reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
@@ -176,7 +176,7 @@ async def do_draw(player: Player):
         f'{taking_player.user.get_mention(as_html=True)} бере карти.\n'
         f'⚔️ Атакує: {attacker.user.get_mention(as_html=True)} (🃏{len(attacker.cards)})\n'
         f'🛡️ Захищається: {defender.user.get_mention(as_html=True)} (🃏{len(defender.cards)})\n\n'
-        f'♦️ Козир: {game.deck.trump_ico}\n'
+        f'🃏 Козир: {game.deck.trump_ico}\n'
         f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
     reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)

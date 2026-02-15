@@ -185,18 +185,27 @@ class Game:
         self.logger.debug(f"Switching turn. Skip defender: {skip_def}")
         
         if not skip_def:
-            start_index_base = self.players.index(self.opponent_player) if self.opponent_player else self.attacker_index
-            
-            for i in range(1, len(self.players) + 1):
-                next_index = (start_index_base + i) % len(self.players)
-                if not self.players[next_index].finished_game:
-                    self.attacker_index = next_index
-                    break
+            # On successful defense ("Бито"), the defender becomes the new attacker.
+            if self.opponent_player:
+                self.attacker_index = self.players.index(self.opponent_player)
+            # If no opponent is found (e.g., they just won), we must find the next
+            # active player to prevent the turn from stopping.
             else:
-                self.logger.warning("No active player found to continue.")
+                # This logic finds the next player in order who hasn't finished.
+                start_index = self.attacker_index
+                # Loop through all players to find the next valid one.
+                for i in range(1, len(self.players) + 1):
+                    next_index = (start_index + i) % len(self.players)
+                    if not self.players[next_index].finished_game:
+                        self.attacker_index = next_index
+                        break
+                else:
+                    # This could happen at the very end of the game.
+                    self.logger.warning("No active player found to continue.")
 
         self.is_pass = False
         self._clear_field()
         self.take_cards_from_deck()
-        if not self.current_player.finished_game:
+        # Check if players list is not empty and current_player has not finished
+        if self.players and self.attacker_index < len(self.players) and not self.current_player.finished_game:
             self.current_player.turn_started = datetime.now()
