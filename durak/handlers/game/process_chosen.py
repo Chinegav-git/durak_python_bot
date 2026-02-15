@@ -2,7 +2,8 @@ from aiogram import types
 
 from loader import bot, dp, gm, CHOISE
 from durak.objects import *
-from durak.logic import actions
+from durak.logic import actions, result
+from durak.logic.exceptions import NoGameInChatError
 
 
 async def send_cheat_att(player: Player):
@@ -149,6 +150,17 @@ async def result_handler(query: types.ChosenInlineResult):
     else:
         return
     
+    if game.game_is_over:
+        if query.inline_message_id:
+            try:
+                await bot.delete_message(inline_message_id=query.inline_message_id)
+            except Exception:
+                pass
+        
+        await bot.send_message(chat.id, result.get_result(game))
+        gm.end_game(chat)
+        return
+
     try:
         gm.get_game_from_chat(chat)
     except NoGameInChatError:

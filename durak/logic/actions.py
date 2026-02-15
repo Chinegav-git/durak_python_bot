@@ -24,17 +24,21 @@ async def _delete_message_after_delay(chat_id: int, message_id: int, delay: int)
 
 
 async def send_turn_notification(game: Game):
+    """ Sends notification for a normal turn change ("Бито"). """
     bot = Bot.get_current()
     attacker = game.current_player
     defender = game.opponent_player
     if not defender:
         return
 
-    await bot.send_message(
-        game.chat.id,
-        f"⚔️ Хід гравця {attacker.user.get_mention(as_html=True)}\n"
-        f"🛡️ Захищається {defender.user.get_mention(as_html=True)}"
+    text = (
+        f'✅ <b>Перехід ходу</b>\n\n'
+        f'⚔️ Атакує: {attacker.user.get_mention(as_html=True)} (🃏{len(attacker.cards)})\n'
+        f'🛡️ Захищається: {defender.user.get_mention(as_html=True)} (🃏{len(defender.cards)})\n\n'
+        f'♦️ Козир: {game.deck.trump_ico}\n'
+        f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
+    await bot.send_message(game.chat.id, text)
 
 
 async def win(game: Game, player: Player):
@@ -92,8 +96,10 @@ async def do_turn(game: Game, skip_def: bool = False):
         else:
             break
 
-    game.turn(skip_def=skip_def)  # This now resets is_pass to False
-    await send_turn_notification(game)
+    game.turn(skip_def=skip_def)
+    # Only send notification on normal turn change to avoid duplicates
+    if not skip_def:
+        await send_turn_notification(game)
 
 
 async def do_leave_player(player: Player, from_turn: bool = False):
@@ -122,9 +128,7 @@ async def do_pass(player: Player):
     game = player.game
     bot = Bot.get_current()
 
-    # The pass action only matters if it's from the current attacker
     if player != game.current_player:
-        # Silently ignore passes from other players
         return
 
     game.is_pass = True
@@ -136,7 +140,6 @@ async def do_pass(player: Player):
     if msg:
         asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 7))
 
-    # The turn only ends on pass if all cards on the table have already been beaten.
     if game.all_beaten_cards:
         await do_turn(game)
 
@@ -158,9 +161,24 @@ async def do_draw(player: Player):
         except Exception:
             pass
     game.attack_sticker_message_ids.clear()
-
+    
+    taking_player = game.opponent_player
     game.take_all_field()
-    await do_turn(game, skip_def=True)
+    await do_turn(game, skip_def=True) # This updates game state but won't send a message
+
+    # Now, send the specific "take cards" message
+    attacker = game.current_player
+    defender = game.opponent_player
+    
+    text = (
+        f'↪️ <b>Хід залишається</b>\n\n'
+        f'{taking_player.user.get_mention(as_html=True)} бере карти.\n'
+        f'⚔️ Атакує: {attacker.user.get_mention(as_html=True)} (🃏{len(attacker.cards)})\n'
+        f'🛡️ Захищається: {defender.user.get_mention(as_html=True)} (🃏{len(defender.cards)})\n\n'
+        f'♦️ Козир: {game.deck.trump_ico}\n'
+        f'🃏 В колоді: {len(game.deck.cards)} карт'
+    )
+    await bot.send_message(game.chat.id, text)
 
 
 async def do_attack_card(player: Player, card: Card):
@@ -168,7 +186,6 @@ async def do_attack_card(player: Player, card: Card):
     user = player.user
     bot = Bot.get_current()
 
-    # An attack resets the pass state for the main attacker
     if player == game.current_player:
         game.is_pass = False
 
@@ -227,11 +244,9 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     if sticker_id:
         asyncio.create_task(_delete_message_after_delay(game.chat.id, sticker_id, 7))
 
-    # The round ends if all cards are beaten AND the main attacker has passed or can't continue.
     if game.all_beaten_cards and (game.is_pass or not game.attacker_can_continue):
         await do_turn(game)
     else:
-        # If the round is not over, invite others to toss more cards.
         toss_more_markup = types.InlineKeyboardMarkup(inline_keyboard=[
             [types.InlineKeyboardButton(text='↪️ Підкинути ще', switch_inline_query_current_chat='')]
         ])

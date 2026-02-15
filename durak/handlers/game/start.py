@@ -11,7 +11,7 @@ from durak.logic.utils import (
 
 @dp.message_handler(commands=[Commands.START], chat_type=['group', 'supergroup'])
 async def start_handler(message: types.Message):
-    ''' Start a game '''
+    """ Start a game """
     user = message.from_user
     chat = message.chat
 
@@ -33,14 +33,14 @@ async def start_handler(message: types.Message):
         await message.answer(f'🚫 Недостатньо гравців!\n🎮 Приєднатися до гри - /{Commands.JOIN}')
     
     else:
-        await message.answer(f'🎮 Гра почалася!\n\n🎯 Козир - {game.deck.trump_ico}')
-
+        # Send a single, consistent start message
         current = game.current_player
         opponent = game.opponent_player
         text = (
             f'🎯 <b>Початок раунду</b>\n\n'
-            f'⚔️ <b>Атакує:</b> {current.user.get_mention(as_html=True)} 🃏 {len(current.cards)} карт\n'
-            f'🛡️ <b>Захищається:</b> {opponent.user.get_mention(as_html=True)} 🃏 {len(opponent.cards)} карт\n\n'
-            f'🎯 <b>Козир:</b> {game.deck.trump_ico}\n'
+            f'⚔️ Атакує: {current.user.get_mention(as_html=True)} (🃏{len(current.cards)})\n'
+            f'🛡️ Захищається: {opponent.user.get_mention(as_html=True)} (🃏{len(opponent.cards)})\n\n'
+            f'♦️ Козир: {game.deck.trump_ico}\n'
+            f'🃏 В колоді: {len(game.deck.cards)} карт'
         )
         await message.answer(text, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE))
