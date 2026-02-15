@@ -32,6 +32,15 @@ class Deck:
         except IndexError:
             raise DeckEmptyError()
 
+    def draw_many(self, count: int) -> List[Card]:
+        cards_to_draw = []
+        for _ in range(count):
+            try:
+                cards_to_draw.append(self.draw())
+            except DeckEmptyError:
+                break  # Stop if the deck runs out of cards
+        return cards_to_draw
+
 
     def dismiss(self, card: Card):
         self.beaten.append(card)
