@@ -21,7 +21,7 @@ class Game:
         self.deck: Deck = Deck()
         self.field: Dict[Card, Optional[Card]] = dict()
         self.trump: c.Suits = None
-        self.players: List[Player] = list()
+        self.players: List[Player] = [Player(self, creator)] # <--- FIX
         self.started: bool = False
         self.creator: types.User = creator
         self.open: bool = True
