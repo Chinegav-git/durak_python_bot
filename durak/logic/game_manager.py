@@ -57,6 +57,14 @@ class GameManager:
 
     # --- Game Logic Helpers ---
 
+    def is_user_in_any_game(self, user_id: int) -> bool:
+        """Checks if a user is currently a player in any active, in-memory game."""
+        for game in self.games.values():
+            for player in game.players:
+                if player.user.id == user_id:
+                    return True
+        return False
+
     def get_game_end_message(self, game: Game) -> str:
         """Generates the game over message based on the game's state."""
         winners = [p for p in game.players if p.finished_game and p != game.durak]
@@ -85,7 +93,7 @@ class GameManager:
     def new_game(self, chat: types.Chat, creator: types.User) -> Game:
         if self.games.get(chat.id):
             raise GameAlreadyInChatError
-        if self._check_user_in_game_db_session(creator.id):
+        if self.is_user_in_any_game(creator.id):
             raise AlreadyJoinedInGlobalError
 
         self._new_game_db_session(chat.id, creator.id)
@@ -148,7 +156,7 @@ class GameManager:
             raise LimitPlayersInGameError
         if any(p.user.id == user.id for p in game.players):
             raise AlreadyJoinedError
-        if self._check_user_in_game_db_session(user.id):
+        if self.is_user_in_any_game(user.id):
             raise AlreadyJoinedInGlobalError
 
         self._update_user_playing_status_db_session([user.id], True)
