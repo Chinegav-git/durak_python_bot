@@ -31,7 +31,7 @@ async def inline_handler(query: types.InlineQuery):
         game = player.game
         
         # Fetch chat settings asynchronously
-        settings_task = asyncio.create_task(get_chat_settings(db_session, game.id))
+        settings_task = asyncio.create_task(get_chat_settings(game.id))
         
         if not game.started:
             # game not started
