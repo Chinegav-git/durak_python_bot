@@ -30,20 +30,6 @@ class Player:
         self.turn_started: datetime = datetime.now()
         self.waiting_time: int = Config.WAITING_TIME
 
-
-    def draw_cards_from_deck(self):
-        """ Take the missing number of cards from the deck """
-        lack = max(0, self.game.COUNT_CARDS_IN_START - len(self.cards))
-        if lack == 0:
-            return
-            
-        try:
-            cards_to_draw = self.game.deck.draw_many(lack)
-            self.add_cards(cards_to_draw)
-        except DeckEmptyError:
-            self.logger.warning(f'DeckEmptyError for player {self.user.id}')
-
-
     def add_cards(self, cards: List[Card]):
         """ Add cards in hands """
         self.cards += cards

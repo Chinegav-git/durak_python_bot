@@ -184,8 +184,40 @@ class Game:
         players_in_turn = self.rotate_players(self.players, self.attacker_index)
         active_players_in_turn = [p for p in players_in_turn if not p.finished_game]
 
+        players_who_need_cards = []
+        total_needed = 0
         for player in active_players_in_turn:
-            player.draw_cards_from_deck()
+            needed = max(0, self.COUNT_CARDS_IN_START - len(player.cards))
+            if needed > 0:
+                players_who_need_cards.append((player, needed))
+                total_needed += needed
+        
+        if total_needed > len(self.deck.cards) and len(self.deck.cards) > 0:
+            remaining_cards = self.deck.draw_many(len(self.deck.cards))
+            
+            if len(players_who_need_cards) >= 2:
+                p1, _ = players_who_need_cards[0]
+                p2, _ = players_who_need_cards[1]
+                
+                p1_gets = (len(remaining_cards) + 1) // 2
+                
+                p1.add_cards(remaining_cards[:p1_gets])
+                p2.add_cards(remaining_cards[p1_gets:])
+            elif len(players_who_need_cards) == 1:
+                p1, _ = players_who_need_cards[0]
+                p1.add_cards(remaining_cards)
+        else:
+            for player, needed in players_who_need_cards:
+                try:
+                    cards = self.deck.draw_many(needed)
+                    player.add_cards(cards)
+                except DeckEmptyError:
+                    self.logger.warning(f"DeckEmptyError for {player.user.id} despite check.")
+                    try:
+                        cards = self.deck.draw_many(len(self.deck.cards))
+                        player.add_cards(cards)
+                    except DeckEmptyError:
+                        pass
 
     def turn(self, skip_def: bool = False) -> None:
         self.logger.debug(f"Switching turn. Skip defender: {skip_def}")
