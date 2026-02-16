@@ -35,6 +35,8 @@ class Game:
 
         self.attack_announce_message_ids: Dict[Card, int] = {}
         self.attack_sticker_message_ids: Dict[Card, int] = {}
+        
+        self.defender_cards_on_round_start: int = 0
 
         self.COUNT_CARDS_IN_START: int = Config.COUNT_CARDS_IN_START
         self.MAX_PLAYERS: int = Config.MAX_PLAYERS
@@ -73,6 +75,10 @@ class Game:
         self.trump = self.deck.trump
         self.started = True
         self.take_cards_from_deck()
+        
+        opponent = self.opponent_player
+        if opponent:
+            self.defender_cards_on_round_start = len(opponent.cards)
 
     def rotate_players(self, lst: List[Player], index: int) -> List[Player]:
         return lst[index:] + lst[:index]
@@ -136,7 +142,7 @@ class Game:
         if not opponent:
             return False
         return len(self.attacking_cards) < self.COUNT_CARDS_IN_START and \
-            len(self.attacking_cards) < len(opponent.cards)
+            len(self.attacking_cards) < self.defender_cards_on_round_start
 
     @property
     def attacker_can_continue(self) -> bool:
@@ -206,6 +212,13 @@ class Game:
         self.is_pass = False
         self._clear_field()
         self.take_cards_from_deck()
+        
+        opponent = self.opponent_player
+        if opponent:
+            self.defender_cards_on_round_start = len(opponent.cards)
+        else:
+            self.defender_cards_on_round_start = 0
+        
         # Check if players list is not empty and current_player has not finished
         if self.players and self.attacker_index < len(self.players) and not self.current_player.finished_game:
             self.current_player.turn_started = datetime.now()

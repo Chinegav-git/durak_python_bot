@@ -57,9 +57,9 @@ async def win(game: Game, player: Player):
 
     if not game.winner:
         game.winner = player
-        await bot.send_message(chat.id, f'🏆 <a href="tg://user?id={player.user.id}">{player.user.full_name}</a> - переможець!')
+        await bot.send_message(chat.id, f'🏆 {player.user.get_mention(as_html=True)} - переможець!')
     else:
-        await bot.send_message(chat.id, f'🎉 <a href="tg://user?id={player.user.id}">{player.user.full_name}</a> - теж перемагає!')
+        await bot.send_message(chat.id, f'🎉 {player.user.get_mention(as_html=True)} - теж перемагає!')
     
     if player not in game.winners:
         game.winners.append(player)
@@ -71,34 +71,48 @@ async def do_turn(game: Game, skip_def: bool = False):
     while True:
         if game.game_is_over:
             if gm.get_game_from_chat(chat):
-                winners_text = "\n".join([f'🏆 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in getattr(game, 'winners', [])])
-                losers_text = "\n".join([f'💔 <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in game.players])
+                winners = getattr(game, 'winners', [])
+                winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in winners])
+                if not winners_text:
+                    winners_text = "Немає"
+
+                if game.durak:
+                    losers_text = f'💔 {game.durak.user.get_mention(as_html=True)}'
+                    final_text = (
+                        f'🎮 <b>Гру закінчено!</b>\n\n'
+                        f'<b>Переможці:</b>\n{winners_text}\n\n'
+                        f'<b>Програв:</b>\n{losers_text}'
+                    )
+                else:
+                    # Draw case
+                    final_text = (
+                        f'🤝 <b>Гру закінчено! Нічия!</b>\n\n'
+                        f'Усі гравці закінчили гру одночасно.'
+                    )
+
                 gm.end_game(game.chat)
-                await Bot.get_current().send_message(
-                    chat.id,
-                    f'🎮 Гру закінчено!\n\n'
-                    f'<b>Переможці:</b>\n{winners_text}\n\n'
-                    f'<b>Програвші:</b>\n{losers_text}'
-                )
+                await Bot.get_current().send_message(chat.id, final_text, reply_markup=types.ReplyKeyboardRemove())
             return
 
         player_has_left = False
-        for player in list(game.players):
-            if not player.cards and not player.finished_game:
-                await win(game, player)
-                player.finished_game = True
-                if player in game.players:
-                    game.players.remove(player)
-                player_has_left = True
-                break
+        active_players = [p for p in game.players if not p.finished_game]
         
+        # Process winners only if there are more than 1 active players
+        if len(active_players) > 1:
+            for player in list(game.players):
+                if not player.cards and not player.finished_game:
+                    await win(game, player)
+                    player.finished_game = True
+                    player_has_left = True
+                    # We don't remove the player from game.players anymore,
+                    # as game_is_over depends on the full list to correctly identify the durak
+
         if player_has_left:
             continue
         else:
             break
 
     game.turn(skip_def=skip_def)
-    # Only send notification on normal turn change to avoid duplicates
     if not skip_def:
         await send_turn_notification(game)
 
@@ -118,12 +132,10 @@ async def do_leave_player(player: Player, from_turn: bool = False):
     
     if not from_turn:
         was_defender = (game.opponent_player and player.user.id == game.opponent_player.user.id)
-        if player in game.players:
-            game.players.remove(player)
-        if len(game.players) < 2:
+        player.finished_game = True # Mark as finished to be excluded from next turns
+        if len([p for p in game.players if not p.finished_game]) < 2:
             raise NotEnoughPlayersError("Not enough players to continue")
         await do_turn(game, skip_def=was_defender)
-
 
 async def do_pass(player: Player):
     game = player.game
@@ -165,9 +177,8 @@ async def do_draw(player: Player):
     
     taking_player = game.opponent_player
     game.take_all_field()
-    await do_turn(game, skip_def=True) # This updates game state but won't send a message
+    await do_turn(game, skip_def=True)
 
-    # Now, send the specific "take cards" message
     attacker = game.current_player
     defender = game.opponent_player
     
