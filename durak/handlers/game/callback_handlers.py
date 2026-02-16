@@ -1,8 +1,20 @@
 from contextlib import suppress
+from typing import Optional
 from aiogram import types
 from aiogram.utils.exceptions import MessageNotModified, CantParseEntities
 from loader import bot, dp, gm, Commands
 from durak.objects import *
+from durak.objects.errors import PlayerNotFoundError
+from durak.logic import actions as a
+
+
+def get_player_for_user(user: types.User) -> Optional[Player]:
+    """Finds the player object for a given user across all active games."""
+    for game in gm.games.values():
+        for player in game.players:
+            if player.user.id == user.id:
+                return player
+    return None
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data == 'close')
@@ -34,9 +46,14 @@ async def process_callback_kick(callback_query: types.CallbackQuery):
     if user.id != game.creator.id:
         await bot.answer_callback_query(callback_query.id, 'Натискати може тільки творець гри!')
         return
-    
+
     try:
-        gm.kick_player(game, user_id)
+        player_to_kick = game.player_for_id(user_id)
+        if not player_to_kick:
+            raise PlayerNotFoundError
+
+        await a.do_leave_player(player_to_kick)
+
     except PlayerNotFoundError:
         await bot.answer_callback_query(callback_query.id, 'Гравець не знайдений!')
         return
@@ -58,7 +75,9 @@ async def inline_handler(inline_query: types.InlineQuery):
     user = types.User.get_current()
     
     try:
-        player = gm.get_player_from_user(user)
+        player = get_player_for_user(user)
+        if not player:
+             raise PlayerNotFoundError
         game = player.game
     except NoGameInChatError:
         await bot.answer_inline_query(
@@ -89,7 +108,7 @@ async def inline_handler(inline_query: types.InlineQuery):
         return
     
     # player and game
-    player = gm.get_player_from_user(user)
+    player = get_player_for_user(user)
     game = player.game
     query = inline_query.query
 
