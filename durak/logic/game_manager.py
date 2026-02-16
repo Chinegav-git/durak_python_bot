@@ -66,25 +66,35 @@ class GameManager:
         return False
 
     def get_game_end_message(self, game: Game) -> str:
-        """Generates the game over message based on the game's state."""
-        winners = [p for p in game.players if p.finished_game and p != game.durak]
-        losers = [game.durak] if game.durak else []
+        """Generates the game over message based on the game's state, matching the old style."""
+        
+        if not game.durak:
+            # Draw case
+            return (
+                '🤝 <b>Гру закінчено! Нічия!</b>\n\n'
+                'Усі гравці закінчили гру одночасно.'
+            )
 
-        if not winners and not losers:
-            return "🎉 Гру завершено!\n\nНічия!"
+        # Case with a loser (durak)
+        winners = [p for p in game.players if p != game.durak]
+        loser = game.durak
 
-        message_parts = ["🎉 Гру завершено!\n"]
+        message_parts = ["🎮 <b>Гру закінчено!</b>\n"]
 
         if winners:
-            title = "🏆 Переможці:" if len(winners) > 1 else "🏆 Переможець:"
-            message_parts.append(title)
-            message_parts.extend([f'- <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in winners])
+            winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in winners])
+            message_parts.append("<b>Переможці:</b>")
+            message_parts.append(winners_text)
+        else:
+            message_parts.append("<b>Переможці:</b>")
+            message_parts.append("Немає")
         
-        if losers:
+        if loser:
             if winners:
-                message_parts.append("")
-            message_parts.append("Програвші:")
-            message_parts.extend([f'- <a href="tg://user?id={p.user.id}">{p.user.full_name}</a>' for p in losers])
+                message_parts.append("") # Add a newline for separation
+            loser_text = f'💔 {loser.user.get_mention(as_html=True)}'
+            message_parts.append("<b>Програв:</b>")
+            message_parts.append(loser_text)
 
         return "\n".join(message_parts)
 
