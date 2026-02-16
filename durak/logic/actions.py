@@ -178,22 +178,22 @@ async def do_attack_card(player: Player, card: Card):
     user = player.user
     bot = Bot.get_current()
 
+    with session:
+        cs = ChatSetting.get(id=game.chat.id)
+        display_mode = cs.display_mode if cs else 'text'
+        theme_name = cs.card_theme if cs else 'classic'
+        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
+        if us.stats:
+            us.cards_atack += 1
+
     if player == game.current_player:
         game.is_pass = False
 
     player.play_attack(card)
-    
-    with session:
-        cs = ChatSetting.get(id=game.chat.id)
-        display_mode = cs.display_mode if cs else 'text'
-        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
-        if us.stats:
-            us.cards_atack += 1
-    
-    if not player.cards:
-        if len(game.players) <= 2 and not game.deck.cards:
-            game.is_final = True
-            
+
+    if not player.cards and len(game.players) <= 2 and not game.deck.cards:
+        game.is_final = True
+
     beat_markup = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]
     ])
@@ -201,7 +201,7 @@ async def do_attack_card(player: Player, card: Card):
     sticker_msg = None
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
         style = 'trump_normal' if card.suit == game.trump else 'normal'
-        sticker_id = c.THEMES[c.ACTIVE_THEME][style].get(repr(card))
+        sticker_id = c.get_sticker_id(repr(card), theme_name=theme_name, style=style)
         if sticker_id:
             try:
                 sticker_msg = await bot.send_sticker(game.chat.id, sticker_id, reply_markup=beat_markup if display_mode == 'sticker_and_button' else None)

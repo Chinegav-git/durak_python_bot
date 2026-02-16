@@ -36,7 +36,7 @@ async def kick_handler(message: types.Message):
         return
 
     # Prevent kicking the creator
-    if kicked_player.is_creator:
+    if kicked_player.user.id == game.creator.id:
         await message.reply('🚫 Неможливо виключити творця гри.')
         return
     
