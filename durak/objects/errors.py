@@ -32,3 +32,6 @@ class LimitPlayersInGameError(Exception):
 
 class GameStartedError(Exception):
     pass
+
+class PlayerNotFoundError(Exception):
+    pass

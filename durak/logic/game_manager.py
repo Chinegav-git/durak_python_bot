@@ -6,6 +6,8 @@ from pony.orm import db_session
 from aiogram import types, Bot
 from typing import Dict, List, Union
 
+from ..objects.errors import PlayerNotFoundError
+
 
 class GameManager:
     def __init__(self) -> None:

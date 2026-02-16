@@ -24,7 +24,7 @@ async def kick_handler(message: types.Message):
         return
 
     # Check if the user to be kicked is actually in the game
-    kicked_player = game.player_for_user(kicked_user)
+    kicked_player = game.player_for_id(kicked_user.id)
     if not kicked_player:
         await message.reply('🚫 Цей користувач не бере участі в грі.')
         return

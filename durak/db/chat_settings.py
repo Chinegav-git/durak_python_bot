@@ -1,4 +1,4 @@
-from pony.orm import PrimaryKey, Required, Optional
+from pony.orm import PrimaryKey, Required, db_session, Optional
 from .database import db
 
 
@@ -9,8 +9,16 @@ class ChatSetting(db.Entity):
     is_game_active = Required(bool, default=False) # True if game is active in this chat
 
     @staticmethod
+    @db_session
     def get_or_create(chat_id):
         chat_setting = ChatSetting.get(id=chat_id)
         if not chat_setting:
             chat_setting = ChatSetting(id=chat_id)
         return chat_setting
+
+@db_session
+def get_chat_settings(chat_id: int) -> ChatSetting:
+    """
+    Returns chat settings for a given chat_id.
+    """
+    return ChatSetting.get_or_create(chat_id)

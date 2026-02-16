@@ -16,7 +16,7 @@ async def leave_handler(message: types.Message):
         await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return
 
-    player = game.player_for_user(user)
+    player = game.player_for_id(user.id)
 
     if player is None:
         await message.answer('🚫 Ви не в цій грі!')

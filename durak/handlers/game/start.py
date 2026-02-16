@@ -1,6 +1,7 @@
 import asyncio
 from aiogram import types
-from loader import bot, dp, gm, CHOISE, Commands, db_session
+from loader import bot, dp, gm, CHOISE, Commands
+from durak.db.database import session as db_session
 from durak.objects import *
 from durak.logic.utils import (
     user_is_admin,
