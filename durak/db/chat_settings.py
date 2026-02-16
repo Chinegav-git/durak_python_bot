@@ -5,6 +5,7 @@ from .database import db
 class ChatSetting(db.Entity):
     id = PrimaryKey(int, auto=False, size=64)  # Telegram Chat ID
     display_mode = Required(str, default='text')  # 'text', 'text_and_sticker', or 'sticker_and_button'
+    card_theme = Required(str, default='classic') # Name of the card theme file
     is_game_active = Required(bool, default=False) # True if game is active in this chat
 
     @staticmethod
