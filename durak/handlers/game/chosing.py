@@ -30,15 +30,11 @@ async def inline_handler(query: types.InlineQuery):
     else:
         game = player.game
         
-        # Fetch chat settings asynchronously
-        settings_task = asyncio.create_task(get_chat_settings(game.id))
-        
         if not game.started:
             # game not started
             r.add_not_started(result)
         else:
-            # Await for the settings to be fetched
-            chat_settings = await settings_task
+            chat_settings = get_chat_settings(game.id)
             theme_name = chat_settings.card_theme if chat_settings else 'classic'
             
             playable = []  # playable cards

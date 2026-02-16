@@ -39,7 +39,7 @@ async def start_handler(message: types.Message):
         return
     
     # Asynchronously fetch chat settings to get the card theme
-    settings = await get_chat_settings(chat.id)
+    settings = get_chat_settings(chat.id)
     theme_name = settings.card_theme if settings else 'classic'
     
     # Get the sticker for the trump suit
