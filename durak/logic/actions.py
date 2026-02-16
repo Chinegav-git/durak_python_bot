@@ -236,7 +236,10 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     if sticker_id:
         asyncio.create_task(_delete_message_after_delay(game.chat.id, sticker_id, 7))
 
-    if game.all_beaten_cards and (game.is_pass or not game.attacker_can_continue):
+    active_players_count = len([p for p in game.players if not p.finished_game])
+    should_autopass = (not game.attacker_can_continue) and (active_players_count < 3)
+
+    if game.all_beaten_cards and (game.is_pass or should_autopass):
         await do_turn(game)
     else:
         toss_more_markup = types.InlineKeyboardMarkup(inline_keyboard=[
