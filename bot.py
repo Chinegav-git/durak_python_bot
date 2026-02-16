@@ -21,13 +21,18 @@ from durak.handlers import game, info, game_mode, card_theme
 
 if __name__ == '__main__':
     logging.info("Starting bot...")
-    while True:
-        try:
-            # Пропускаємо старі оновлення, щоб уникнути їх обробки після збою
-            executor.start_polling(dp, skip_updates=True)
-        except (NetworkError, asyncio.TimeoutError) as e:
-            logging.warning(f"Network error detected: {e}. Waiting 15 seconds before retry...")
-            time.sleep(15)
-        except Exception as e:
-            logging.error(f"An unexpected error occurred: {e}. Restarting in 30 seconds...")
-            time.sleep(30)
+    
+    # Код для автоматичного перезапуску при збоях мережі (тимчасово вимкнено для діагностики)
+    # while True:
+    #     try:
+    #         # Пропускаємо старі оновлення, щоб уникнути їх обробки після збою
+    #         executor.start_polling(dp, skip_updates=True)
+    #     except (NetworkError, asyncio.TimeoutError) as e:
+    #         logging.warning(f"Network error detected: {e}. Waiting 15 seconds before retry...")
+    #         time.sleep(15)
+    #     except Exception as e:
+    #         logging.error(f"An unexpected error occurred: {e}. Restarting in 30 seconds...")
+    #         time.sleep(30)
+
+    # Стандартний запуск без автоматичного перезапуску
+    executor.start_polling(dp, skip_updates=True)
