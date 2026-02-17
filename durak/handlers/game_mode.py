@@ -3,45 +3,84 @@ from aiogram.dispatcher.filters import Command
 from pony.orm import db_session
 
 from durak.db.chat_settings import ChatSetting
-# from durak.logic.utils import user_can_change_gamemode
 from loader import dp
+from durak.handlers.settings import settings_cd
+
+def get_gamemode_keyboard(chat_id):
+    """
+    Generates the keyboard for game mode settings.
+    Marks the current mode.
+    """
+    with db_session:
+        current_mode = ChatSetting.get_or_create(chat_id).display_mode
+
+    modes = {
+        "text": "📝 Текст",
+        "text_and_sticker": "🃏 Текст + Стікери",
+        "sticker_and_button": "🕹️ Стікери + Кнопки"
+    }
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+
+    for mode_id, mode_name in modes.items():
+        text = f"» {mode_name} «" if current_mode == mode_id else mode_name
+        markup.add(types.InlineKeyboardButton(
+            text=text,
+            callback_data=settings_cd.new(level="gamemode_select", value=mode_id)
+        ))
+
+    markup.add(types.InlineKeyboardButton(
+        text="⬅️ Назад",
+        callback_data=settings_cd.new(level="main_menu", value="back")
+    ))
+    return markup
 
 
 @dp.message_handler(Command("gamemode"))
 async def set_game_mode(message: types.Message):
-    chat = message.chat
-    user = message.from_user
-    args = message.get_args()
-
-    # First, check permissions.
-    # This is an async operation and must be outside a db_session.
-    # if not await user_can_change_gamemode(user, chat):
-    #     await message.answer("🚫 Тільки адміністратор чату може змінювати режим гри.")
-    #     return
-
-    # All database operations are now grouped in one synchronous block.
-    reply_message = ""
+    """
+    Forwards user to the settings menu
+    """
     with db_session:
-        chat_setting = ChatSetting.get_or_create(chat.id)
-        
-        if not args:
-            current_mode = chat_setting.display_mode
-            reply_message = (
-                f"Поточний режим гри: `{current_mode}`\n\n"
-                f"Доступні режими:\n"
-                f"📝 `/gamemode text` — класичний текстовий режим\n"
-                f"🃏 `/gamemode text_and_sticker` — текст та стікери карт\n"
-                f"🕹️ `/gamemode sticker_and_button` — стікери та кнопки (мінімалістично)\n\n"
-                f"Щоб змінити режим, просто натисніть на потрібну команду."
-            )
-        else:
-            new_mode = args.lower()
-            if new_mode in ("text", "text_and_sticker", "sticker_and_button"):
-                chat_setting.display_mode = new_mode
-                reply_message = f"✅ Режим гри змінено на `{new_mode}`"
-            else:
-                reply_message = "Невідомий режим. Доступні: `text`, `text_and_sticker`, `sticker_and_button`."
+        chat_setting = ChatSetting.get_or_create(message.chat.id)
+        current_mode = chat_setting.display_mode
 
-    # The async operation (sending a message) is now safely outside the db_session.
-    if reply_message:
-        await message.answer(reply_message, parse_mode='Markdown')
+    await message.answer(
+        f"Поточний режим гри: `{current_mode}`.\n\n"
+        f"Щоб змінити режим, скористайтесь меню /settings.",
+        parse_mode='Markdown'
+    )
+
+
+@dp.callback_query_handler(settings_cd.filter(level="gamemode"))
+async def show_gamemode_settings(call: types.CallbackQuery):
+    """
+    Shows the game mode selection menu.
+    """
+    await call.message.edit_text(
+        "✍️ **Режим гри**\n\nОберіть, як будуть відображатись карти та ігровий процес:",
+        reply_markup=get_gamemode_keyboard(call.message.chat.id)
+    )
+    await call.answer()
+
+
+@dp.callback_query_handler(settings_cd.filter(level="gamemode_select"))
+async def set_gamemode_callback(call: types.CallbackQuery, callback_data: dict):
+    """
+    Sets the chosen game mode from a callback.
+    """
+    new_mode = callback_data.get("value")
+    chat_id = call.message.chat.id
+
+    with db_session:
+        chat_setting = ChatSetting.get_or_create(chat_id)
+        if chat_setting.display_mode != new_mode:
+            chat_setting.display_mode = new_mode
+            await call.answer("✅ Режим гри змінено")
+        else:
+            await call.answer("Цей режим вже встановлено")
+
+    # Update the keyboard to show the new current mode
+    await call.message.edit_reply_markup(
+        reply_markup=get_gamemode_keyboard(chat_id)
+    )

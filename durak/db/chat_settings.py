@@ -1,4 +1,6 @@
+# Import necessary components from the Pony ORM library
 from pony.orm import PrimaryKey, Required, db_session, Optional
+# Import the database object from the current package
 from .database import db
 
 

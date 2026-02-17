@@ -2,7 +2,8 @@ from aiogram import types
 from typing import List, Optional
 import asyncio
 
-from loader import bot, dp, gm, CHOISE, db_session
+from loader import bot, dp, gm, CHOISE
+from pony.orm import db_session
 from durak.objects import *
 from durak.logic import result as r
 from durak.db.chat_settings import get_chat_settings
