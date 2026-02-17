@@ -1,5 +1,4 @@
 from datetime import datetime
-from aiogram import types
 from typing import Any, List, Dict, Optional
 import logging
 
@@ -15,17 +14,20 @@ from config import Config
 class Game:
     """ This is Game """
 
-    def __init__(self, chat: types.Chat, creator: types.User) -> None:
-        self.id = chat.id
-        self.chat: types.Chat = chat
+    def __init__(self, chat_id: int, chat_type: str, creator_id: int, creator_first_name: str, creator_username: Optional[str]) -> None:
+        self.id = chat_id
+        self.chat_type: str = chat_type
         self.deck: Deck = Deck()
         self.field: Dict[Card, Optional[Card]] = dict()
         self.trump: c.Suits = None
-        self.players: List[Player] = [Player(self, creator)] # <--- FIX
         self.started: bool = False
-        self.creator: types.User = creator
         self.open: bool = True
         self.mode: str = Config.DEFAULT_GAMEMODE
+
+        self.creator_id: int = creator_id
+        self.players: List[Player] = [
+            Player(self, creator_id, creator_first_name, creator_username)
+        ]
 
         self.attacker_index: int = 0
         self.winner: Player | None = None
@@ -69,7 +71,7 @@ class Game:
         return False
 
     def player_for_id(self, user_id: int) -> Optional[Player]:
-        return next((p for p in self.players if p.user.id == user_id), None)
+        return next((p for p in self.players if p.id == user_id), None)
 
     def start(self):
         self.deck._fill_cards()
@@ -214,7 +216,7 @@ class Game:
                     cards = self.deck.draw_many(needed)
                     player.add_cards(cards)
                 except DeckEmptyError:
-                    self.logger.warning(f"DeckEmptyError for {player.user.id} despite check.")
+                    self.logger.warning(f"DeckEmptyError for {player.id} despite check.")
                     try:
                         cards = self.deck.draw_many(len(self.deck.cards))
                         player.add_cards(cards)

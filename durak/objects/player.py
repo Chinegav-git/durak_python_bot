@@ -1,7 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
 from time import time
-from aiogram import types
 from typing import List, Optional, Set
 
 import logging
@@ -20,15 +19,24 @@ if typing.TYPE_CHECKING:
 class Player:
     """ This is Player"""
 
-    def __init__(self, game: Game, user: types.User) -> None:
-        self.user: types.User = user  # User obj | from Aiogram
-        self.game: Game = game  # Game obj
+    def __init__(self, game: Game, user_id: int, first_name: str, username: Optional[str]) -> None:
+        self.id: int = user_id
+        self.first_name: str = first_name
+        self.username: Optional[str] = username
+        self.game: Game = game
         self.cards: List[Card] = list()
-        self.finished_game: bool = False # Player status
+        self.finished_game: bool = False
         self.logger = logging.getLogger(__name__)
         self.anti_cheat: int = int(time())
         self.turn_started: datetime = datetime.now()
         self.waiting_time: int = Config.WAITING_TIME
+
+    @property
+    def mention(self) -> str:
+        """ Returns a string to mention the user in a message. """
+        if self.username:
+            return f"<a href='https://t.me/{self.username}'>{self.first_name}</a>"
+        return f"<a href='tg://user?id={self.id}'>{self.first_name}</a>"
 
     def add_cards(self, cards: List[Card]):
         """ Add cards in hands """
@@ -131,11 +139,11 @@ class Player:
         if card in self.cards:
             self.cards.remove(card)
         else:
-            self.logger.warning(f"Attempted to remove card {card} not in player's hand for user {self.user.id}")
+            self.logger.warning(f"Attempted to remove card {card} not in player's hand for user {self.id}")
 
     def __repr__(self) -> str:
-        return repr(self.user)
+        return f"<Player id={self.id} name='{self.first_name}'>"
     
 
     def __str__(self) -> str:
-        return str(self.user)
+        return self.first_name

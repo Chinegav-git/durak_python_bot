@@ -29,7 +29,7 @@ class GameManager:
 
     async def save_game(self, game: Game):
         """Saves a game object to Redis."""
-        key = self._game_key(game.chat.id)
+        key = self._game_key(game.id)
         serialized_game = await self._serialize_game(game)
         await self.redis.set(key, serialized_game)
 
@@ -54,11 +54,11 @@ class GameManager:
         if chat_setting:
             chat_setting.is_game_active = False
 
-        player_ids = [p.user.id for p in players]
+        player_ids = [p.id for p in players]
         self._update_user_playing_status_db_session(player_ids, False)
 
         for pl in players:
-            us = UserSetting.get_or_create(pl.user.id)
+            us = UserSetting.get_or_create(pl.id)
             if us.stats:
                 us.games_played += 1
 
@@ -84,7 +84,7 @@ class GameManager:
             serialized_game = await self.redis.get(key)
             if serialized_game:
                 game = await self._deserialize_game(serialized_game)
-                if any(p.user.id == user_id for p in game.players):
+                if any(p.id == user_id for p in game.players):
                     return True
         return False
 
@@ -105,7 +105,7 @@ class GameManager:
         message_parts = ["🎮 <b>Гру закінчено!</b>\n"]
 
         if winners:
-            winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in winners])
+            winners_text = "\n".join([f'🏆 {p.mention}' for p in winners])
             message_parts.append("<b>Переможці:</b>")
             message_parts.append(winners_text)
         else:
@@ -115,7 +115,7 @@ class GameManager:
         if loser:
             if winners:
                 message_parts.append("") # Add a newline for separation
-            loser_text = f'💔 {loser.user.get_mention(as_html=True)}'
+            loser_text = f'💔 {loser.mention}'
             message_parts.append("<b>Програв:</b>")
             message_parts.append(loser_text)
 
@@ -132,7 +132,13 @@ class GameManager:
 
         await asyncio.to_thread(self._new_game_db_session, chat.id, creator.id)
         
-        game = Game(chat, creator)
+        game = Game(
+            chat_id=chat.id,
+            chat_type=chat.type,
+            creator_id=creator.id,
+            creator_first_name=creator.first_name,
+            creator_username=creator.username
+        )
         await self.save_game(game)
         return game
 
@@ -145,7 +151,7 @@ class GameManager:
         raise NoGameInChatError
 
     async def end_game(self, target: Union[types.Chat, Game]) -> None:
-        chat_id = target.chat.id if isinstance(target, Game) else target.id
+        chat_id = target.id if isinstance(target, Game) else target.id
         game_key = self._game_key(chat_id)
         
         game = None
@@ -182,19 +188,19 @@ class GameManager:
         game.started = False
         game.winner = winner
         
-        losers = [p for p in game.players if p.user.id != winner_id]
+        losers = [p for p in game.players if p.id != winner_id]
 
         message_parts = ["За командою адміністратора, гру примусово завершено!\n"]
         message_parts.append("🏆 Переможець:")
-        message_parts.append(f'- <a href="tg://user?id={winner.user.id}">{winner.user.full_name}</a>')
+        message_parts.append(f'- <a href="tg://user?id={winner.id}">{winner.first_name}</a>')
         
         if losers:
             message_parts.append("")
             message_parts.append("Програвші:")
-            message_parts.extend([f'- <a href="tg://user?id={loser.user.id}">{loser.user.full_name}</a>' for loser in losers])
+            message_parts.extend([f'- <a href="tg://user?id={loser.id}">{loser.first_name}</a>' for loser in losers])
 
         message = "\n".join(message_parts)
-        await self.bot.send_message(game.chat.id, message)
+        await self.bot.send_message(game.id, message)
         await self.end_game(game)
 
     async def join_in_game(self, game: Game, user: types.User) -> None:
@@ -204,14 +210,19 @@ class GameManager:
             raise LobbyClosedError
         if len(game.players) >= game.MAX_PLAYERS:
             raise LimitPlayersInGameError
-        if any(p.user.id == user.id for p in game.players):
+        if any(p.id == user.id for p in game.players):
             raise AlreadyJoinedError
         if await self.is_user_in_any_game(user.id):
             raise AlreadyJoinedInGlobalError
 
         await asyncio.to_thread(self._update_user_playing_status_db_session, [user.id], True)
         
-        player = Player(game, user)
+        player = Player(
+            game=game, 
+            user_id=user.id, 
+            first_name=user.first_name, 
+            username=user.username
+        )
         game.players.append(player)
         
         await self.save_game(game)
@@ -222,7 +233,7 @@ class GameManager:
         if len(game.players) <= 1:
             raise NotEnoughPlayersError
 
-        unique_player_ids = {p.user.id for p in game.players}
+        unique_player_ids = {p.id for p in game.players}
         if len(unique_player_ids) != len(game.players):
             await self.end_game(game)
             raise Exception("Критична помилка: виявлено дублювання гравців. Гру було скасовано.")
