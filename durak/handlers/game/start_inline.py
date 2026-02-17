@@ -8,16 +8,16 @@ from durak.logic.utils import (
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('start_game'))
 async def start_inline_handler(callback_query: types.CallbackQuery):
     """ Start a game from an inline button """
-    user = callback_query.from_user
-    chat = callback_query.message.chat
+    user_id = callback_query.from_user.id
+    chat_id = callback_query.message.chat.id
 
     try:
-        game = gm.get_game_from_chat(chat)
+        game = gm.get_game_from_chat(chat_id)
     except NoGameInChatError:
         await bot.answer_callback_query(callback_query.id, f'🚫 У цьому чаті немає гри! Створіть її за допомогою - /{Commands.NEW}')
         return
 
-    if not (await user_is_creator_or_admin(user, game, chat)):
+    if not (await user_is_creator_or_admin(user_id, game)):
         await bot.answer_callback_query(callback_query.id, '🚫 Почати гру може лише її творець, адміністратор чату або адміністратор бота.')
         return
     try:
@@ -31,15 +31,15 @@ async def start_inline_handler(callback_query: types.CallbackQuery):
     else:
         await bot.answer_callback_query(callback_query.id, '🚀 Гра почалася!')
         # Delete the lobby message
-        await bot.delete_message(callback_query.message.chat.id, callback_query.message.message_id)
+        await bot.delete_message(chat_id, callback_query.message.message_id)
 
         # Send a new message with the game status
         current = game.current_player
         opponent = game.opponent_player
         text = (
             f'🎯 <b>Початок раунду</b>\n\n'
-            f'⚔️ <b>Атакує:</b> {current.user.get_mention(as_html=True)} 🃏 {len(current.cards)} карт\n'
-            f'🛡️ <b>Захищається:</b> {opponent.user.get_mention(as_html=True)} 🃏 {len(opponent.cards)} карт\n\n'
+            f'⚔️ <b>Атакує:</b> {current.get_mention(as_html=True)} 🃏 {len(current.cards)} карт\n'
+            f'🛡️ <b>Захищається:</b> {opponent.get_mention(as_html=True)} 🃏 {len(opponent.cards)} карт\n\n'
             f'🎯 <b>Козир:</b> {game.deck.trump_ico}\n'
         )
-        await bot.send_message(chat.id, text, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE))
+        await bot.send_message(chat_id, text, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE))

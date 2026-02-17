@@ -1,28 +1,28 @@
 from ..objects import Game
-from aiogram.types import User, Chat
+from aiogram.types import User
 from aiogram import Bot
 from config import Config
 
 
-def user_is_creator(user: User, game: Game):
-    return user.id == game.creator.id
+def user_is_creator(user_id: int, game: Game):
+    return user_id == game.creator_id
 
 
-def user_is_bot_admin(user: User):
-    return user.id in Config.ADMINS
+def user_is_bot_admin(user_id: int):
+    return user_id in Config.ADMINS
 
 
-async def user_is_admin(user: User, chat: Chat):
-    return user.id in (await get_admin_ids(chat.id))
+async def user_is_admin(user_id: int, chat_id: int):
+    return user_id in (await get_admin_ids(chat_id))
 
 
-async def user_is_creator_or_admin(user: User, game: Game, chat: Chat):
-    return user_is_creator(user, game) or user_is_bot_admin(user) or (await user_is_admin(user, chat))
+async def user_is_creator_or_admin(user_id: int, game: Game):
+    return user_is_creator(user_id, game) or user_is_bot_admin(user_id) or (await user_is_admin(user_id, game.chat_id))
 
 
-async def user_can_change_gamemode(user: User, chat: Chat):
+async def user_can_change_gamemode(user_id: int, chat_id: int):
     """Checks if a user can change the game mode (bot admin or chat admin)."""
-    return user_is_bot_admin(user) or (await user_is_admin(user, chat))
+    return user_is_bot_admin(user_id) or (await user_is_admin(user_id, chat_id))
 
 
 async def get_admin_ids(chat_id: int):

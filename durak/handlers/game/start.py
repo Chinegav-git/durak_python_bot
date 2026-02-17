@@ -17,16 +17,16 @@ from durak.db.chat_settings import get_chat_settings
 @dp.message_handler(Command(Commands.START), chat_type=['group', 'supergroup'])
 async def start_handler(message: types.Message):
     """ Start a game """ 
-    user = message.from_user
-    chat = message.chat
+    user_id = message.from_user.id
+    chat_id = message.chat.id
 
     try:
-        game = await gm.get_game_from_chat(chat)
+        game = await gm.get_game_from_chat(chat_id)
     except NoGameInChatError:
         await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return
     
-    if not (await user_is_creator_or_admin(user, game, chat)):
+    if not (await user_is_creator_or_admin(user_id, game)):
         await message.answer('🚫 Почати гру може лише її творець, адміністратор чату або адміністратор бота.')
         return
 
@@ -41,7 +41,7 @@ async def start_handler(message: types.Message):
         return
     
     # Asynchronously fetch chat settings to get the card theme
-    settings = await asyncio.to_thread(get_chat_settings, chat.id)
+    settings = await asyncio.to_thread(get_chat_settings, chat_id)
     theme_name = settings.card_theme if settings else 'classic'
     
     # Get the sticker for the trump suit
@@ -56,8 +56,8 @@ async def start_handler(message: types.Message):
     opponent = game.opponent_player
     text = (
         f'🎯 <b>Початок раунду</b>\n\n'
-        f'⚔️ Атакує: {current.user.get_mention(as_html=True)} (🃏{len(current.cards)})\n'
-        f'🛡️ Захищається: {opponent.user.get_mention(as_html=True)} (🃏{len(opponent.cards)})\n\n'
+        f'⚔️ Атакує: {current.get_mention(as_html=True)} (🃏{len(current.cards)})\n'
+        f'🛡️ Захищається: {opponent.get_mention(as_html=True)} (🃏{len(opponent.cards)})\n\n'
         f'🃏 Козир: {game.deck.trump_ico}\n' # Keep the icon for text-based reference
         f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
