@@ -1,10 +1,12 @@
+
 from aiogram import types
+from aiogram.dispatcher.filters import Command
 from loader import dp, gm, Commands
 import durak.logic.actions as a
 from durak.objects import NoGameInChatError
 from durak.logic.actions import NotEnoughPlayersError
 
-@dp.message_handler(commands=[Commands.LEAVE], chat_type=['group', 'supergroup'])
+@dp.message_handler(Command(Commands.LEAVE), chat_type=['group', 'supergroup'])
 async def leave_handler(message: types.Message):
     """ Leave a game """
     user = message.from_user

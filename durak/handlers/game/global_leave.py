@@ -1,10 +1,12 @@
+
 from aiogram import types
+from aiogram.dispatcher.filters import Command
 from loader import bot, dp, gm, Commands
 import durak.logic.actions as a
 from durak.objects import *
 from pony.orm import db_session
 
-@dp.message_handler(commands=[Commands.GLEAVE], chat_type=['group', 'supergroup'])
+@dp.message_handler(Command(Commands.GLEAVE), chat_type=['group', 'supergroup'])
 async def global_leave_handler(message: types.Message):
     """ Global leave from any game """
     user = types.User.get_current()

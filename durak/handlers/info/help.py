@@ -1,9 +1,11 @@
+
 from aiogram import types
+from aiogram.dispatcher.filters import Command
 from textwrap import dedent
 from loader import bot, dp, Commands
 
 
-@dp.message_handler(commands=[Commands.HELP, Commands.START_BOT])
+@dp.message_handler(Command([Commands.HELP, Commands.START_BOT]))
 async def help_handler(message: types.Message):
     help_text = dedent(f"""<b>🎮 Дотримуйтесь цих кроків:</b>
 1. 📱 Додайте цього бота до групи

@@ -1,7 +1,9 @@
+
 from aiogram import types
+from aiogram.dispatcher.filters import Command
 from loader import dp, Commands
 
-@dp.message_handler(commands=[Commands.STATS, Commands.OFF_STATS, Commands.ON_STATS])
+@dp.message_handler(Command([Commands.STATS, Commands.OFF_STATS, Commands.ON_STATS]))
 async def stats_redirect_handler(message: types.Message):
     """
     Informs user about the new settings menu.

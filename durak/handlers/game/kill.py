@@ -1,4 +1,6 @@
+
 from aiogram import types
+from aiogram.dispatcher.filters import Command
 from loader import bot, dp, gm, Commands
 from durak.objects import *
 from durak.logic.utils import (
@@ -9,7 +11,7 @@ from durak.logic.utils import (
 )
 
 
-@dp.message_handler(commands=[Commands.KILL], chat_type=['group', 'supergroup'])
+@dp.message_handler(Command(Commands.KILL), chat_type=['group', 'supergroup'])
 async def start_handler(message: types.Message):
     ''' Kill a game '''
     user = types.User.get_current()

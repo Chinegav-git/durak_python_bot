@@ -1,5 +1,6 @@
 import asyncio
 from aiogram import types
+from aiogram.dispatcher.filters import Command
 from loader import dp, gm, CHOISE, Commands, bot
 from durak.objects import (
     NoGameInChatError,
@@ -13,7 +14,7 @@ from durak.logic.utils import (
 from durak.db.chat_settings import get_chat_settings
 
 
-@dp.message_handler(commands=[Commands.START], chat_type=['group', 'supergroup'])
+@dp.message_handler(Command(Commands.START), chat_type=['group', 'supergroup'])
 async def start_handler(message: types.Message):
     """ Start a game """ 
     user = message.from_user

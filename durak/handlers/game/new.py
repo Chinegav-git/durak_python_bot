@@ -1,9 +1,10 @@
 from aiogram import types
+from aiogram.dispatcher.filters import Command
 from loader import dp, gm, Commands
 from durak.objects import GameAlreadyInChatError, AlreadyJoinedInGlobalError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-@dp.message_handler(commands=[Commands.NEW], chat_type=['group', 'supergroup'])
+@dp.message_handler(Command(Commands.NEW), chat_type=['group', 'supergroup'])
 async def new_handler(message: types.Message):
     """ Creating new game """
     user = message.from_user

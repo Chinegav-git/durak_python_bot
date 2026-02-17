@@ -1,4 +1,6 @@
+
 from aiogram import types
+from aiogram.dispatcher.filters import Command
 from loader import bot, dp, gm, Commands
 from durak.objects import *
 import durak.logic.actions as a
@@ -6,7 +8,7 @@ from durak.logic.utils import (
     user_is_creator_or_admin
 )
 
-@dp.message_handler(commands=[Commands.KICK], chat_type=['group', 'supergroup'])
+@dp.message_handler(Command(Commands.KICK), chat_type=['group', 'supergroup'])
 async def kick_handler(message: types.Message):
     """ Kick a player from a game """
     if not message.reply_to_message:
