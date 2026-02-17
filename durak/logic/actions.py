@@ -3,10 +3,10 @@ import asyncio
 from aiogram import types, Bot
 
 from loader import gm, CHOISE
-from ..db import ChatSetting, UserSetting, session
+from ..db import ChatSetting, UserSetting
 from ..objects import *
 from ..objects import card as c
-
+from pony.orm import db_session
 
 class NotEnoughPlayersError(Exception):
     """Not enough players to continue the game."""
@@ -78,15 +78,18 @@ async def send_no_more_attacks_notification(game: Game):
         asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 10))
 
 
+@db_session
+def _win_db_session(player: Player):
+    user = player.user
+    us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
+    if us.stats:
+        us.first_places += 1
+
 async def win(game: Game, player: Player):
     chat = game.chat
     bot = Bot.get_current()
 
-    with session:
-        user = player.user
-        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
-        if us.stats:
-            us.first_places += 1
+    await asyncio.to_thread(_win_db_session, player)
     
     if not hasattr(game, 'winners'):
         game.winners = []
@@ -99,16 +102,17 @@ async def win(game: Game, player: Player):
     
     if player not in game.winners:
         game.winners.append(player)
-
+    
+    await gm.save_game(game)
 
 async def do_turn(game: Game, skip_def: bool = False):
     chat = game.chat
     
     while True:
         if game.game_is_over:
-            if gm.get_game_from_chat(chat):
+            if await gm.get_game_from_chat(chat):
                 final_text = gm.get_game_end_message(game)
-                gm.end_game(game.chat)
+                await gm.end_game(game.chat)
                 await Bot.get_current().send_message(chat.id, final_text, reply_markup=types.ReplyKeyboardRemove())
             return
 
@@ -125,9 +129,9 @@ async def do_turn(game: Game, skip_def: bool = False):
         if player_has_left:
             # Immediately re-check if the game is over after a player has won
             if game.game_is_over:
-                if gm.get_game_from_chat(chat):
+                if await gm.get_game_from_chat(chat):
                     final_text = gm.get_game_end_message(game)
-                    gm.end_game(game.chat)
+                    await gm.end_game(game.chat)
                     await Bot.get_current().send_message(chat.id, final_text, reply_markup=types.ReplyKeyboardRemove())
                 return
             continue
@@ -135,22 +139,27 @@ async def do_turn(game: Game, skip_def: bool = False):
             break
 
     game.turn(skip_def=skip_def)
+    await gm.save_game(game)
+
     if not skip_def:
         await send_turn_notification(game)
 
+@db_session
+def _leave_player_db_session(player: Player):
+    user = player.user
+    us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
+    if us.stats:
+        us.games_played += 1
 
 async def do_leave_player(player: Player, from_turn: bool = False):
     game = player.game
     if not game.started:
         if player in game.players:
             game.players.remove(player)
+        await gm.save_game(game)
         return
 
-    with session:
-        user = player.user
-        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
-        if us.stats:
-            us.games_played += 1
+    await asyncio.to_thread(_leave_player_db_session, player)
     
     if not from_turn:
         was_defender = (game.opponent_player and player.user.id == game.opponent_player.user.id)
@@ -167,6 +176,7 @@ async def do_pass(player: Player):
         return
 
     game.is_pass = True
+    await gm.save_game(game)
     
     msg = await bot.send_message(
         game.chat.id,
@@ -215,19 +225,22 @@ async def do_draw(player: Player):
     reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
     await bot.send_message(game.chat.id, text, reply_markup=reply_markup)
 
+@db_session
+def _attack_card_db_session(game: Game, player: Player):
+    cs = ChatSetting.get(id=game.chat.id)
+    display_mode = cs.display_mode if cs else 'text'
+    theme_name = cs.card_theme if cs else 'classic'
+    us = UserSetting.get(id=player.user.id) or UserSetting.create(id=player.user.id)
+    if us.stats:
+        us.cards_atack += 1
+    return display_mode, theme_name
 
 async def do_attack_card(player: Player, card: Card):
     game = player.game
     user = player.user
     bot = Bot.get_current()
 
-    with session:
-        cs = ChatSetting.get(id=game.chat.id)
-        display_mode = cs.display_mode if cs else 'text'
-        theme_name = cs.card_theme if cs else 'classic'
-        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
-        if us.stats:
-            us.cards_atack += 1
+    display_mode, theme_name = await asyncio.to_thread(_attack_card_db_session, game, player)
 
     if player == game.current_player:
         game.is_pass = False
@@ -240,6 +253,8 @@ async def do_attack_card(player: Player, card: Card):
 
     if not player.cards and len(game.players) <= 2 and not game.deck.cards:
         game.is_final = True
+
+    await gm.save_game(game)
 
     beat_markup = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]
@@ -254,6 +269,7 @@ async def do_attack_card(player: Player, card: Card):
                 sticker_msg = await bot.send_sticker(game.chat.id, sticker_id, reply_markup=beat_markup if display_mode == 'sticker_and_button' else None)
                 if sticker_msg:
                     game.attack_sticker_message_ids[card] = sticker_msg.message_id
+                    await gm.save_game(game)
             except Exception:
                 pass
 
@@ -262,7 +278,13 @@ async def do_attack_card(player: Player, card: Card):
         msg = await bot.send_message(game.chat.id, text, reply_markup=beat_markup)
         if msg:
             game.attack_announce_message_ids[card] = msg.message_id
+            await gm.save_game(game)
 
+@db_session
+def _defence_card_db_session(player: Player):
+    us = UserSetting.get(id=player.user.id) or UserSetting.create(id=player.user.id)
+    if us.stats:
+        us.cards_beaten += 1
 
 async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     game = player.game
@@ -271,10 +293,7 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
 
     player.play_defence(atk_card, def_card)
     
-    with session:
-        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
-        if us.stats:
-            us.cards_beaten += 1
+    await asyncio.to_thread(_defence_card_db_session, player)
 
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)
     if announce_id:
@@ -282,6 +301,8 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     sticker_id = game.attack_sticker_message_ids.pop(atk_card, None)
     if sticker_id:
         asyncio.create_task(_delete_message_after_delay(game.chat.id, sticker_id, 7))
+
+    await gm.save_game(game)
 
     # Get the number of players still in the game
     active_players_count = len([p for p in game.players if not p.finished_game])

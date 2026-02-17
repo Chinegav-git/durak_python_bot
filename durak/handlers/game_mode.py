@@ -77,10 +77,10 @@ async def set_gamemode_callback(call: types.CallbackQuery, callback_data: dict):
         if chat_setting.display_mode != new_mode:
             chat_setting.display_mode = new_mode
             await call.answer("✅ Режим гри змінено")
+            
+            # Update the keyboard to show the new current mode
+            await call.message.edit_reply_markup(
+                reply_markup=get_gamemode_keyboard(chat_id)
+            )
         else:
             await call.answer("Цей режим вже встановлено")
-
-    # Update the keyboard to show the new current mode
-    await call.message.edit_reply_markup(
-        reply_markup=get_gamemode_keyboard(chat_id)
-    )

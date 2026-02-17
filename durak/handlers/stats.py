@@ -10,7 +10,7 @@ def get_stats_text_and_keyboard(user_id):
     Generates the text and keyboard for the statistics menu.
     """
     with db_session:
-        us = UserSetting.get_or_create(id=user_id)
+        us = UserSetting.get_or_create(user_id)
         stat_status_icon = "✅" if us.stats else "❌"
         stat_status_text = "Увімкнений" if us.stats else "Вимкнений"
         
@@ -54,7 +54,7 @@ async def toggle_stats_callback(call: types.CallbackQuery):
     user_id = call.from_user.id
 
     with db_session:
-        us = UserSetting.get_or_create(id=user_id)
+        us = UserSetting.get_or_create(user_id)
         us.stats = not us.stats
         new_status = "увімкнено" if us.stats else "вимкнено"
     

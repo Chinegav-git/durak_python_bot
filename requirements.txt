@@ -19,3 +19,4 @@ python-dotenv==1.2.1
 pytz==2025.2
 typing_extensions==4.15.0
 yarl==1.22.0
+redis==5.0.4

@@ -1,12 +1,13 @@
 import asyncio
 from aiogram import types
-from loader import bot, dp, gm, CHOISE, Commands
-from durak.db.database import session as db_session
-from durak.objects import *
+from loader import dp, gm, CHOISE, Commands, bot
+from durak.objects import (
+    NoGameInChatError,
+    GameStartedError,
+    NotEnoughPlayersError,
+    card
+)
 from durak.logic.utils import (
-    user_is_admin,
-    user_is_creator,
-    user_is_bot_admin,
     user_is_creator_or_admin
 )
 from durak.db.chat_settings import get_chat_settings
@@ -19,7 +20,7 @@ async def start_handler(message: types.Message):
     chat = message.chat
 
     try:
-        game = gm.get_game_from_chat(chat)
+        game = await gm.get_game_from_chat(chat)
     except NoGameInChatError:
         await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return
@@ -29,7 +30,7 @@ async def start_handler(message: types.Message):
         return
 
     try:
-        gm.start_game(game)
+        await gm.start_game(game)
     except (GameStartedError, NotEnoughPlayersError) as e:
         error_messages = {
             GameStartedError: '🎮 Гра вже запущена!',
@@ -39,7 +40,7 @@ async def start_handler(message: types.Message):
         return
     
     # Asynchronously fetch chat settings to get the card theme
-    settings = get_chat_settings(chat.id)
+    settings = await asyncio.to_thread(get_chat_settings, chat.id)
     theme_name = settings.card_theme if settings else 'classic'
     
     # Get the sticker for the trump suit

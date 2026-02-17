@@ -1,17 +1,17 @@
 from aiogram import types
-from loader import bot, dp, gm, Commands
+from loader import dp, gm, Commands
 import durak.logic.actions as a
-from durak.objects import *
-from pony.orm import db_session
+from durak.objects import NoGameInChatError
+from durak.logic.actions import NotEnoughPlayersError
 
 @dp.message_handler(commands=[Commands.LEAVE], chat_type=['group', 'supergroup'])
 async def leave_handler(message: types.Message):
     """ Leave a game """
-    user = types.User.get_current()
-    chat = types.Chat.get_current()
+    user = message.from_user
+    chat = message.chat
 
     try:
-        game = gm.get_game_from_chat(chat)
+        game = await gm.get_game_from_chat(chat)
     except NoGameInChatError:
         await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return
@@ -27,7 +27,7 @@ async def leave_handler(message: types.Message):
         await a.do_leave_player(player)
     except NotEnoughPlayersError:
         # end_game now handles all DB updates for all players
-        gm.end_game(chat)
+        await gm.end_game(chat)
         await message.answer('🎮 Гра завершена, оскільки гравців не залишилося!')
     else:
         if game.started:

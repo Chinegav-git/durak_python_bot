@@ -3,14 +3,16 @@ from typing import List, Optional
 import asyncio
 
 from loader import bot, dp, gm, CHOISE
-from pony.orm import db_session
 from durak.objects import *
 from durak.logic import result as r
 from durak.db.chat_settings import get_chat_settings
 
-def get_player_for_user(user: types.User) -> Optional[Player]:
+async def get_player_for_user(user: types.User) -> Optional[Player]:
     """Finds the player object for a given user across all active games."""
-    for game in gm.games.values():
+    for game_id in await gm.get_all_games():
+        game = await gm.get_game(game_id)
+        if not game:
+            continue
         for player in game.players:
             if player.user.id == user.id:
                 return player
@@ -20,9 +22,9 @@ def get_player_for_user(user: types.User) -> Optional[Player]:
 @dp.inline_handler()
 async def inline_handler(query: types.InlineQuery):
     """ Inline handler :> """
-    user = types.User.get_current()
+    user = query.from_user
     text = query.query or ''
-    player = get_player_for_user(user)
+    player = await get_player_for_user(user)
     result: List[types.InlineQueryResult] = []
 
     if player is None:
@@ -35,8 +37,8 @@ async def inline_handler(query: types.InlineQuery):
             # game not started
             r.add_not_started(result)
         else:
-            chat_settings = get_chat_settings(game.id)
-            theme_name = chat_settings.card_theme if chat_settings else 'classic'
+            settings = await asyncio.to_thread(get_chat_settings, game.id)
+            theme_name = settings.card_theme if settings else 'classic'
             
             playable = []  # playable cards
 
@@ -88,7 +90,8 @@ async def inline_handler(query: types.InlineQuery):
 
             r.add_gameinfo(game, result, theme_name)
 
-        for res in result:
-            res.id += ':%d' % player.anti_cheat
+        if player:
+            for res in result:
+                res.id += ':%d' % player.anti_cheat
 
     await query.answer(result, cache_time=0)

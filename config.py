@@ -10,6 +10,9 @@ env.read_env()
 
 BOT_TOKEN = env.str("BOT_TOKEN")
 ADMINS = list(map(int, env.list("ADMINS")))
+REDIS_HOST = env.str("REDIS_HOST", "localhost")
+REDIS_PORT = env.int("REDIS_PORT", 6379)
+REDIS_DB = env.int("REDIS_DB", 0)
 
 
 @dataclass
@@ -22,6 +25,11 @@ class Config:
     COUNT_CARDS_IN_START: int = 6
     DEFAULT_GAMEMODE: str = "p"  # :> .......
     DEBUG: bool = False
+
+    # Redis
+    REDIS_HOST: str = REDIS_HOST
+    REDIS_PORT: int = REDIS_PORT
+    REDIS_DB: int = REDIS_DB
     
 
 class Commands:

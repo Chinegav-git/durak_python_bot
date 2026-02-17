@@ -6,9 +6,12 @@ from durak.objects import * # This will import NoGameInChatError from durak.obje
 from durak.logic import actions, result
 
 
-def get_player_for_user(user: types.User) -> Optional[Player]:
+async def get_player_for_user(user: types.User) -> Optional[Player]:
     """Finds the player object for a given user across all active games."""
-    for game in gm.games.values():
+    for game_id in await gm.get_all_games():
+        game = await gm.get_game(game_id)
+        if not game:
+            continue
         for player in game.players:
             if player.user.id == user.id:
                 return player
@@ -27,8 +30,8 @@ async def send_cheat_att(player: Player):
 @dp.chosen_inline_handler()
 async def result_handler(query: types.ChosenInlineResult):
     ''' Inline process '''
-    user = types.User.get_current()
-    player = get_player_for_user(user)
+    user = query.from_user
+    player = await get_player_for_user(user)
 
     if player is None or not player.game.started:
         return
@@ -45,7 +48,12 @@ async def result_handler(query: types.ChosenInlineResult):
         result_id, anti_cheat = result_id.split(':')
         split_result_id = result_id.split('-')
         last_anti_cheat = player.anti_cheat
+        # This part is tricky with async, as player object might be stale
+        # A lock per player might be needed for complex state changes
+        # For now, we assume simple increment is okay
         player.anti_cheat += 1
+        await gm.save_game(game) # Save the updated anti_cheat
+
         if int(anti_cheat) != last_anti_cheat:
             # await send_cheat_att(player)
             return # Ignore old queries

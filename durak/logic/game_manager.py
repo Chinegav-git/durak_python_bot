@@ -1,19 +1,37 @@
 import asyncio
+import pickle
 from ..objects import *
 from ..db import UserSetting, ChatSetting
 from pony.orm import db_session
 
 from aiogram import types, Bot
 from typing import Dict, List, Union
+from redis.asyncio import Redis
 
 from ..objects.errors import PlayerNotFoundError
 
 
 class GameManager:
-    def __init__(self) -> None:
-        self.games: Dict[int, Game] = dict()
+    def __init__(self, redis: Redis) -> None:
+        self.redis: Redis = redis
         self.notify: Dict[int, List[int]] = dict()
         self.bot: Bot = None
+
+    def _game_key(self, chat_id: int) -> str:
+        return f"game:{chat_id}"
+
+    async def _serialize_game(self, game: Game) -> bytes:
+        return pickle.dumps(game)
+
+    async def _deserialize_game(self, data: bytes) -> Game:
+        game: Game = pickle.loads(data)
+        return game
+
+    async def save_game(self, game: Game):
+        """Saves a game object to Redis."""
+        key = self._game_key(game.chat.id)
+        serialized_game = await self._serialize_game(game)
+        await self.redis.set(key, serialized_game)
 
     def set_bot(self, bot: Bot):
         self.bot = bot
@@ -59,11 +77,14 @@ class GameManager:
 
     # --- Game Logic Helpers ---
 
-    def is_user_in_any_game(self, user_id: int) -> bool:
-        """Checks if a user is currently a player in any active, in-memory game."""
-        for game in self.games.values():
-            for player in game.players:
-                if player.user.id == user_id:
+    async def is_user_in_any_game(self, user_id: int) -> bool:
+        """Checks if a user is currently a player in any active game stored in Redis."""
+        game_keys = await self.redis.keys("game:*")
+        for key in game_keys:
+            serialized_game = await self.redis.get(key)
+            if serialized_game:
+                game = await self._deserialize_game(serialized_game)
+                if any(p.user.id == user_id for p in game.players):
                     return True
         return False
 
@@ -102,32 +123,49 @@ class GameManager:
 
     # --- Public methods ---
 
-    def new_game(self, chat: types.Chat, creator: types.User) -> Game:
-        if self.games.get(chat.id):
+    async def new_game(self, chat: types.Chat, creator: types.User) -> Game:
+        game_key = self._game_key(chat.id)
+        if await self.redis.exists(game_key):
             raise GameAlreadyInChatError
-        if self.is_user_in_any_game(creator.id):
+        if await self.is_user_in_any_game(creator.id):
             raise AlreadyJoinedInGlobalError
 
-        self._new_game_db_session(chat.id, creator.id)
+        await asyncio.to_thread(self._new_game_db_session, chat.id, creator.id)
+        
         game = Game(chat, creator)
-        self.games[chat.id] = game
+        await self.save_game(game)
         return game
 
-    def get_game_from_chat(self, chat: types.Chat) -> Game:
-        game = self.games.get(chat.id, None)
-        if game is not None:
+    async def get_game_from_chat(self, chat: types.Chat) -> Game:
+        game_key = self._game_key(chat.id)
+        serialized_game = await self.redis.get(game_key)
+        if serialized_game:
+            game = await self._deserialize_game(serialized_game)
             return game
         raise NoGameInChatError
 
-    def end_game(self, target: Union[types.Chat, Game]) -> None:
+    async def end_game(self, target: Union[types.Chat, Game]) -> None:
         chat_id = target.chat.id if isinstance(target, Game) else target.id
-        game = self.games.pop(chat_id, None)
+        game_key = self._game_key(chat_id)
+        
+        game = None
+        if isinstance(target, Game):
+            game = target
+        else:
+            try:
+                game = await self.get_game_from_chat(target)
+            except NoGameInChatError:
+                pass 
+
+        was_deleted = await self.redis.delete(game_key)
+
         if game:
             players = game.players
-            self._end_game_db_session(chat_id, players)
+            await asyncio.to_thread(self._end_game_db_session, chat_id, players)
+        elif was_deleted:
+             await asyncio.to_thread(self._end_game_db_session, chat_id, [])
         else:
-            # If no game object, at least mark the chat as not having an active game
-            self._end_game_db_session(chat_id, [])
+            await asyncio.to_thread(self._end_game_db_session, chat_id, [])
             raise NoGameInChatError
 
     async def test_win_game(self, game: Game, winner_id: int):
@@ -157,9 +195,9 @@ class GameManager:
 
         message = "\n".join(message_parts)
         await self.bot.send_message(game.chat.id, message)
-        await asyncio.to_thread(self.end_game, game)
+        await self.end_game(game)
 
-    def join_in_game(self, game: Game, user: types.User) -> None:
+    async def join_in_game(self, game: Game, user: types.User) -> None:
         if game.started:
             raise GameStartedError
         if not game.open:
@@ -168,23 +206,26 @@ class GameManager:
             raise LimitPlayersInGameError
         if any(p.user.id == user.id for p in game.players):
             raise AlreadyJoinedError
-        if self.is_user_in_any_game(user.id):
+        if await self.is_user_in_any_game(user.id):
             raise AlreadyJoinedInGlobalError
 
-        self._update_user_playing_status_db_session([user.id], True)
+        await asyncio.to_thread(self._update_user_playing_status_db_session, [user.id], True)
+        
         player = Player(game, user)
         game.players.append(player)
+        
+        await self.save_game(game)
 
-    def start_game(self, game: Game) -> None:
+    async def start_game(self, game: Game) -> None:
         if game.started:
             raise GameStartedError
         if len(game.players) <= 1:
             raise NotEnoughPlayersError
 
-        # Mitigate the original bug's consequences
         unique_player_ids = {p.user.id for p in game.players}
         if len(unique_player_ids) != len(game.players):
-            self.end_game(game)
+            await self.end_game(game)
             raise Exception("Критична помилка: виявлено дублювання гравців. Гру було скасовано.")
 
         game.start()
+        await self.save_game(game)
