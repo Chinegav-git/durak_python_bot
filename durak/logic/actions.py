@@ -42,6 +42,42 @@ async def send_turn_notification(game: Game):
     await bot.send_message(game.chat.id, text, reply_markup=reply_markup)
 
 
+async def send_no_more_attacks_notification(game: Game):
+    """
+    Sends a notification that no more cards can be thrown in the current round.
+    This is used in games with 3 or more players.
+    """
+    bot = Bot.get_current()
+    defender = game.opponent_player
+    if not defender:
+        return
+
+    # The main attacker is always the first in the list of round attackers
+    main_attacker = game.round_attackers[0]
+    
+    # Other attackers are all subsequent unique players in the list
+    support_attackers = []
+    seen_attackers = set()
+    for player in game.round_attackers[1:]:
+        if player.user.id not in seen_attackers:
+            support_attackers.append(player)
+            seen_attackers.add(player.user.id)
+
+    text = (
+        f"🛡️ {defender.user.get_mention(as_html=True)} відбив(ла) усі карти.\n"
+        f"🔄 Більше підкидати не можна.\n\n"
+        f"⚔️ Атакував(ла): {main_attacker.user.get_mention(as_html=True)}"
+    )
+
+    if support_attackers:
+        support_mentions = ', '.join([p.user.get_mention(as_html=True) for p in support_attackers])
+        text += f"\n↪️ Підкидував(ли): {support_mentions}"
+
+    msg = await bot.send_message(game.chat.id, text)
+    if msg:
+        asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 10))
+
+
 async def win(game: Game, player: Player):
     chat = game.chat
     bot = Bot.get_current()
@@ -87,6 +123,13 @@ async def do_turn(game: Game, skip_def: bool = False):
                     player_has_left = True
 
         if player_has_left:
+            # Immediately re-check if the game is over after a player has won
+            if game.game_is_over:
+                if gm.get_game_from_chat(chat):
+                    final_text = gm.get_game_end_message(game)
+                    gm.end_game(game.chat)
+                    await Bot.get_current().send_message(chat.id, final_text, reply_markup=types.ReplyKeyboardRemove())
+                return
             continue
         else:
             break
@@ -189,6 +232,10 @@ async def do_attack_card(player: Player, card: Card):
     if player == game.current_player:
         game.is_pass = False
 
+    # Add player to the list of attackers for this round
+    if player not in game.round_attackers:
+        game.round_attackers.append(player)
+
     player.play_attack(card)
 
     if not player.cards and len(game.players) <= 2 and not game.deck.cards:
@@ -236,9 +283,12 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
     if sticker_id:
         asyncio.create_task(_delete_message_after_delay(game.chat.id, sticker_id, 7))
 
+    # Get the number of players still in the game
     active_players_count = len([p for p in game.players if not p.finished_game])
+    # In a 2-player game, the turn automatically ends if the attacker can't add more cards
     should_autopass = (not game.attacker_can_continue) and (active_players_count < 3)
 
+    # If all cards are beaten and the attacker passes or is forced to pass, end the turn
     if game.all_beaten_cards and (game.is_pass or should_autopass):
         await do_turn(game)
     else:
@@ -250,3 +300,8 @@ async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
             f"🛡️ <b>{user.get_mention(as_html=True)}</b> побив(ла) карту {str(atk_card)} картою {str(def_card)}",
             reply_markup=toss_more_markup,
         )
+        
+        # If no more attacks are allowed, send a notification
+        if not game.allow_atack and active_players_count > 2:
+            await send_no_more_attacks_notification(game)
+

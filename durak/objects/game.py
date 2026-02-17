@@ -37,6 +37,7 @@ class Game:
         self.attack_sticker_message_ids: Dict[Card, int] = {}
         
         self.defender_cards_on_round_start: int = 0
+        self.round_attackers: List[Player] = []
 
         self.COUNT_CARDS_IN_START: int = Config.COUNT_CARDS_IN_START
         self.MAX_PLAYERS: int = Config.MAX_PLAYERS
@@ -169,6 +170,7 @@ class Game:
         self.field.clear()
         self.attack_announce_message_ids.clear()
         self.attack_sticker_message_ids.clear()
+        self.round_attackers.clear()
 
     def take_all_field(self) -> None:
         opponent = self.opponent_player
@@ -219,6 +221,17 @@ class Game:
                     except DeckEmptyError:
                         pass
 
+    def _find_next_active_player_index(self, start_index: int) -> int:
+        """Finds the index of the next player who has not finished the game."""
+        # Loop through all players to find the next valid one.
+        for i in range(1, len(self.players) + 1):
+            next_index = (start_index + i) % len(self.players)
+            if not self.players[next_index].finished_game:
+                return next_index
+        
+        self.logger.warning("No active player found to continue.")
+        return start_index # Fallback
+
     def turn(self, skip_def: bool = False) -> None:
         self.logger.debug(f"Switching turn. Skip defender: {skip_def}")
         
@@ -229,17 +242,17 @@ class Game:
             # If no opponent is found (e.g., they just won), we must find the next
             # active player to prevent the turn from stopping.
             else:
-                # This logic finds the next player in order who hasn't finished.
-                start_index = self.attacker_index
-                # Loop through all players to find the next valid one.
-                for i in range(1, len(self.players) + 1):
-                    next_index = (start_index + i) % len(self.players)
-                    if not self.players[next_index].finished_game:
-                        self.attacker_index = next_index
-                        break
-                else:
-                    # This could happen at the very end of the game.
-                    self.logger.warning("No active player found to continue.")
+                self.attacker_index = self._find_next_active_player_index(self.attacker_index)
+        else: # skip_def is True, meaning defender took cards
+            # The turn should pass to the player after the defender who took the cards.
+            # The defender is the current `opponent_player`.
+            defender = self.opponent_player
+            if defender:
+                defender_index = self.players.index(defender)
+                self.attacker_index = self._find_next_active_player_index(defender_index)
+            else:
+                # Fallback, if there was no defender (e.g. they won), move to next player from attacker
+                self.attacker_index = self._find_next_active_player_index(self.attacker_index)
 
         self.is_pass = False
         self._clear_field()

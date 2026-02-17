@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from time import time
 from aiogram import types
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import logging
 import typing
@@ -52,32 +52,36 @@ class Player:
         self.remove_card(defending_card)
         self.game.defend(attacking_card, defending_card)
     
-
-    def playable_card_atk(self) -> List[Card]:
-        """ Returns a list of cards the player can legally attack with. """
-        playable: List[Card] = []
+    def playable_card_atk(self) -> Set[Card]:
+        """ Returns a set of cards the player can legally attack with for faster lookups. """
         game = self.game
-        
-        # The `can_add_to_field` method correctly handles all logic, including
-        # who is allowed to attack (not the defender) and who can start (main attacker).
-        if not game.allow_atack and not game.field:
-             return [] # Can't attack if limit is reached (unless it's the very first move)
 
-        for card in self.cards:
-            if self.can_add_to_field(card):
-                playable.append(card)
+        # If the attack limit is reached and the field is not empty, no more cards can be added.
+        if not game.allow_atack and game.field:
+            return set()
 
-        return playable
-    
+        # The defender can never add cards.
+        if self == game.opponent_player:
+            return set()
 
-    def playable_card_def(self, atk_card: Optional[Card] = None) -> List[Card]:
-        playable: List[Card] = []
+        # If the field is empty, only the main attacker can play any of their cards.
+        if not game.field:
+            if self == game.current_player:
+                return set(self.cards)
+            else: # Other players can't start
+                return set()
 
-        for card in self.cards:
-            if self.can_beat(atk_card, card):
-                playable.append(card)
+        # If the field is not empty, any non-defender can add a card if it matches a rank on the field.
+        all_field_cards = game.attacking_cards + game.defending_cards
+        field_values = {c.value for c in all_field_cards if c}
 
-        return playable
+        return {card for card in self.cards if card.value in field_values}
+
+    def playable_card_def(self, atk_card: Optional[Card] = None) -> Set[Card]:
+        """ Returns a set of cards the player can legally defend with. """
+        if not atk_card:
+            return set()
+        return {card for card in self.cards if self.can_beat(atk_card, card)}
 
 
     def card_match(self, card_1: Card, card_2: Card) -> bool:
