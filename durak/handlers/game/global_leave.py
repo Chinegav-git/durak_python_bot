@@ -37,7 +37,7 @@ async def global_leave_handler(message: types.Message):
 
     except NotEnoughPlayersError:
         # end_game handles all cleanup
-        gm.end_game(game_to_leave)
+        await gm.end_game(game_to_leave.chat)
         await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) гру!')
         await bot.send_message(game_to_leave.chat.id, '🎮 Гра завершена, оскільки не залишилося гравців!')
         await message.answer(f'👋 ({mention}) - Ви успішно покинули гру в іншому чаті, і вона була завершена.')

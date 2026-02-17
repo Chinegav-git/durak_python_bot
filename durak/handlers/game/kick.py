@@ -20,7 +20,7 @@ async def kick_handler(message: types.Message):
     chat = message.chat
 
     try:
-        game = gm.get_game_from_chat(chat.id)
+        game = await gm.get_game_from_chat(chat.id)
     except NoGameInChatError:
         await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return

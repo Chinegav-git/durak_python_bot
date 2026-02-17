@@ -15,7 +15,7 @@ async def start_handler(message: types.Message):
     chat_id = message.chat.id
 
     try:
-        game = gm.get_game_from_chat(chat_id)
+        game = await gm.get_game_from_chat(chat_id)
     except NoGameInChatError:
         await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return
@@ -24,7 +24,7 @@ async def start_handler(message: types.Message):
 
     if (await user_is_creator_or_admin(user_id, game)):
         # game end
-        gm.end_game(chat_id)
+        await gm.end_game(chat_id)
         await message.answer(f'🛑 {mention} завершив(ла) гру!')
         return
     else:

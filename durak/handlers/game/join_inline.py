@@ -10,7 +10,7 @@ async def join_inline_handler(callback_query: types.CallbackQuery):
     chat = callback_query.message.chat
 
     try:
-        game = gm.get_game_from_chat(chat)
+        game = await gm.get_game_from_chat(chat)
     except NoGameInChatError:
         await bot.answer_callback_query(callback_query.id, f'🚫 У цьому чаті немає гри! Створіть її за допомогою - /{Commands.NEW}')
         return
