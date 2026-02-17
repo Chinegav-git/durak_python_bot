@@ -16,7 +16,7 @@ async def join_inline_handler(callback_query: types.CallbackQuery):
         return
 
     try:
-        gm.join_in_game(game, user)
+        await gm.join_in_game(game, user)
     except GameStartedError:
         await bot.answer_callback_query(callback_query.id, '🎮 Гра вже запущена! 🚫 Ви не можете приєднатися!')
     except LobbyClosedError:

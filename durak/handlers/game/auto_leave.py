@@ -13,7 +13,7 @@ async def auto_leave_handler(message: types.Message):
     chat = message.chat
 
     try:
-        game = gm.get_game_from_chat(chat)
+        game = await gm.get_game_from_chat(chat)
     except NoGameInChatError:
         return
 
@@ -28,7 +28,7 @@ async def auto_leave_handler(message: types.Message):
         # The action handles DB updates and game state
         await a.do_leave_player(player_left)
     except NotEnoughPlayersError:
-        gm.end_game(chat)
+        await gm.end_game(chat)
         await bot.send_message(chat.id, f'👋 ({mention}) покинув(ла) чат, і гра була завершена, оскільки не залишилося гравців.')
     else:
         if game.started:

@@ -22,7 +22,7 @@ async def start_inline_handler(callback_query: types.CallbackQuery):
         return
     try:
         # game start
-        gm.start_game(game)
+        await gm.start_game(game)
     except GameStartedError:
         await bot.answer_callback_query(callback_query.id, '🎮 Гра вже запущена!')
     except NotEnoughPlayersError:

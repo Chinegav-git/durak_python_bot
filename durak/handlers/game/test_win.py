@@ -10,7 +10,7 @@ async def test_win(message: types.Message):
     Available only for admins.
     """
     try:
-        game = gm.get_game_from_chat(message.chat)
+        game = await gm.get_game_from_chat(message.chat)
     except NoGameInChatError:
         return await message.reply("Гру в цьому чаті не знайдено.")
 
