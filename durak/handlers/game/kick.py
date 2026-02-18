@@ -20,7 +20,7 @@ async def kick_handler(message: types.Message):
     chat = message.chat
 
     try:
-        game = await gm.get_game_from_chat(chat.id)
+        game = await gm.get_game_from_chat(chat)
     except NoGameInChatError:
         await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return
@@ -49,7 +49,7 @@ async def kick_handler(message: types.Message):
         # The action handles DB updates and game state
         await a.do_leave_player(kicked_player)
     except NotEnoughPlayersError:
-        await gm.end_game(chat.id)
+        await gm.end_game(chat)
         await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}.\n🎮 Гра завершена, оскільки не залишилося гравців!')
     else:
         if game.started:

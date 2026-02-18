@@ -1,12 +1,25 @@
+
 from aiogram import types
 from loader import dp
+from durak.db.chat_settings import get_chat_settings
 
-# Этот хендлер будет ловить ЛЮБОЙ стикер, отправленный боту
-# Фильтр is_admin=True гарантирует, что только админ сможет использовать эту функцию
-@dp.message_handler(is_admin=True, content_types=types.ContentType.STICKER)
+@dp.message_handler(content_types=types.ContentType.STICKER, chat_type=['group', 'supergroup'])
 async def get_sticker_id(message: types.Message):
     """
-    Отвечает на сообщение со стикером, отправляя его file_id.
+    Отвечает на сообщение со стикером, отправляя его file_id, 
+    если в настройках чата включена соответствующая опция.
+    Только для администраторов.
     """
-    # Убираем IsAdminFilter из импортов, он больше не нужен напрямую
+    settings = get_chat_settings(message.chat.id)
+    
+    # 1. Проверяем, включена ли функция в настройках чата
+    if not settings.sticker_id_helper:
+        return  # Если выключено, просто ничего не делаем
+
+    # 2. Проверяем, является ли отправитель админом
+    user = await message.chat.get_member(message.from_user.id)
+    if not user.is_chat_admin():
+        return # Если не админ, тоже ничего не делаем
+
+    # 3. Если все проверки пройдены, отправляем ID стикера
     await message.reply(f"Sticker ID:\n`{message.sticker.file_id}`", parse_mode="Markdown")

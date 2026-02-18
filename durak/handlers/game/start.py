@@ -18,10 +18,10 @@ from durak.db.chat_settings import get_chat_settings
 async def start_handler(message: types.Message):
     """ Start a game """ 
     user_id = message.from_user.id
-    chat_id = message.chat.id
+    chat = message.chat
 
     try:
-        game = await gm.get_game_from_chat(chat_id)
+        game = await gm.get_game_from_chat(chat)
     except NoGameInChatError:
         await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return
@@ -41,7 +41,7 @@ async def start_handler(message: types.Message):
         return
     
     # Asynchronously fetch chat settings to get the card theme
-    settings = await asyncio.to_thread(get_chat_settings, chat_id)
+    settings = await asyncio.to_thread(get_chat_settings, chat.id)
     theme_name = settings.card_theme if settings else 'classic'
     
     # Get the sticker for the trump suit

@@ -142,8 +142,9 @@ class GameManager:
         await self.save_game(game)
         return game
 
-    async def get_game_from_chat(self, chat: types.Chat) -> Game:
-        game_key = self._game_key(chat.id)
+    async def get_game_from_chat(self, chat: Union[types.Chat, int]) -> Game:
+        chat_id = chat if isinstance(chat, int) else chat.id
+        game_key = self._game_key(chat_id)
         serialized_game = await self.redis.get(game_key)
         if serialized_game:
             game = await self._deserialize_game(serialized_game)
