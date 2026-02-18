@@ -56,8 +56,8 @@ async def start_handler(message: types.Message):
     opponent = game.opponent_player
     text = (
         f'🎯 <b>Початок раунду</b>\n\n'
-        f'⚔️ Атакує: {current.get_mention(as_html=True)} (🃏{len(current.cards)})\n'
-        f'🛡️ Захищається: {opponent.get_mention(as_html=True)} (🃏{len(opponent.cards)})\n\n'
+        f'⚔️ Атакує: {current.mention} (🃏{len(current.cards)})\n'
+        f'🛡️ Захищається: {opponent.mention} (🃏{len(opponent.cards)})\n\n'
         f'🃏 Козир: {game.deck.trump_ico}\n' # Keep the icon for text-based reference
         f'🃏 В колоді: {len(game.deck.cards)} карт'
     )

@@ -10,6 +10,8 @@ from .errors import DeckEmptyError
 
 from config import Config
 
+logger = logging.getLogger(__name__)
+
 
 class Game:
     """ This is Game """
@@ -43,7 +45,6 @@ class Game:
 
         self.COUNT_CARDS_IN_START: int = Config.COUNT_CARDS_IN_START
         self.MAX_PLAYERS: int = Config.MAX_PLAYERS
-        self.logger = logging.getLogger(__name__)
 
     @property
     def game_is_over(self) -> bool:
@@ -216,7 +217,7 @@ class Game:
                     cards = self.deck.draw_many(needed)
                     player.add_cards(cards)
                 except DeckEmptyError:
-                    self.logger.warning(f"DeckEmptyError for {player.id} despite check.")
+                    logger.warning(f"DeckEmptyError for {player.id} despite check.")
                     try:
                         cards = self.deck.draw_many(len(self.deck.cards))
                         player.add_cards(cards)
@@ -231,11 +232,11 @@ class Game:
             if not self.players[next_index].finished_game:
                 return next_index
         
-        self.logger.warning("No active player found to continue.")
+        logger.warning("No active player found to continue.")
         return start_index # Fallback
 
     def turn(self, skip_def: bool = False) -> None:
-        self.logger.debug(f"Switching turn. Skip defender: {skip_def}")
+        logger.debug(f"Switching turn. Skip defender: {skip_def}")
         
         if not skip_def:
             # On successful defense ("Бито"), the defender becomes the new attacker.

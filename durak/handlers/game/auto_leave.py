@@ -32,6 +32,6 @@ async def auto_leave_handler(message: types.Message):
         await bot.send_message(chat.id, f'👋 ({mention}) покинув(ла) чат, і гра була завершена, оскільки не залишилося гравців.')
     else:
         if game.started:
-            await bot.send_message(chat.id, f'👋 ({mention}) покинув(ла) чат, тому був(ла) виключений(а) з гри.\n🎯 Хід робить гравець {game.current_player.user.get_mention(as_html=True)}')
+            await bot.send_message(chat.id, f'👋 ({mention}) покинув(ла) чат, тому був(ла) виключений(а) з гри.\n🎯 Хід робить гравець {game.current_player.mention}')
         else:
             await bot.send_message(chat.id, f'👋 ({mention}) покинув(ла) чат і був(ла) виключений(а) з лоббі.')

@@ -17,7 +17,7 @@ async def global_leave_handler(message: types.Message):
     # Find the player and game across all active games
     for game in gm.games.values():
         for player in game.players:
-            if player.user.id == user.id:
+            if player.id == user.id:
                 player_to_leave = player
                 game_to_leave = game
                 break
@@ -43,6 +43,6 @@ async def global_leave_handler(message: types.Message):
         await message.answer(f'👋 ({mention}) - Ви успішно покинули гру в іншому чаті, і вона була завершена.')
     else:
         if game_to_leave.started:
-            await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) гру\n🎯 Хід робить гравець {game_to_leave.current_player.user.get_mention(as_html=True)}')
+            await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) гру\n🎯 Хід робить гравець {game_to_leave.current_player.mention}')
         else:
             await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) лобі!')

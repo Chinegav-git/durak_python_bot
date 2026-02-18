@@ -33,6 +33,6 @@ async def leave_handler(message: types.Message):
         await message.answer('🎮 Гра завершена, оскільки гравців не залишилося!')
     else:
         if game.started:
-            await message.answer(f'👍 Добре, хід робить гравець {game.current_player.user.get_mention(as_html=True)}')
+            await message.answer(f'👍 Добре, хід робить гравець {game.current_player.mention}')
         else:
             await message.answer(f'👋 ({user.get_mention(as_html=True)}) - Покинув(ла) лобі!')

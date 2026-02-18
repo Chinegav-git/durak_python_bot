@@ -2,31 +2,28 @@ from __future__ import annotations
 from datetime import datetime
 from time import time
 from typing import List, Optional, Set
-
 import logging
 import typing
 
 from . import card as c
-from .errors import (DeckEmptyError)
-
+from .errors import DeckEmptyError
 from config import Config
 
 if typing.TYPE_CHECKING:
     from .game import Game
     from .card import Card
 
+logger = logging.getLogger(__name__)
 
 class Player:
     """ This is Player"""
 
-    def __init__(self, game: Game, user_id: int, first_name: str, username: Optional[str]) -> None:
+    def __init__(self, user_id: int, first_name: str, username: Optional[str]) -> None:
         self.id: int = user_id
         self.first_name: str = first_name
         self.username: Optional[str] = username
-        self.game: Game = game
         self.cards: List[Card] = list()
         self.finished_game: bool = False
-        self.logger = logging.getLogger(__name__)
         self.anti_cheat: int = int(time())
         self.turn_started: datetime = datetime.now()
         self.waiting_time: int = Config.WAITING_TIME
@@ -42,108 +39,81 @@ class Player:
         """ Add cards in hands """
         self.cards += cards
 
-
-    def leave(self):
+    def leave(self, game: Game):
         """ Cleaning self (Cards) """
         for card in self.cards:
-            self.game.deck.dismiss(card)
+            game.deck.dismiss(card)
         self.cards.clear()
 
-
-    def play_attack(self, card: Card):
+    def play_attack(self, game: Game, card: Card):
         """ Plays a card and removes it from hand """
         self.remove_card(card)
-        self.game.attack(card)
+        game.attack(card)
 
-
-    def play_defence(self, attacking_card: Card, defending_card: Card):
+    def play_defence(self, game: Game, attacking_card: Card, defending_card: Card):
         self.remove_card(defending_card)
-        self.game.defend(attacking_card, defending_card)
+        game.defend(attacking_card, defending_card)
     
-    def playable_card_atk(self) -> Set[Card]:
+    def playable_card_atk(self, game: Game) -> Set[Card]:
         """ Returns a set of cards the player can legally attack with for faster lookups. """
-        game = self.game
-
-        # If the attack limit is reached and the field is not empty, no more cards can be added.
         if not game.allow_atack and game.field:
             return set()
 
-        # The defender can never add cards.
         if self == game.opponent_player:
             return set()
 
-        # If the field is empty, only the main attacker can play any of their cards.
         if not game.field:
             if self == game.current_player:
                 return set(self.cards)
-            else: # Other players can't start
+            else:
                 return set()
 
-        # If the field is not empty, any non-defender can add a card if it matches a rank on the field.
         all_field_cards = game.attacking_cards + game.defending_cards
         field_values = {c.value for c in all_field_cards if c}
-
         return {card for card in self.cards if card.value in field_values}
 
-    def playable_card_def(self, atk_card: Optional[Card] = None) -> Set[Card]:
+    def playable_card_def(self, game: Game, atk_card: Optional[Card] = None) -> Set[Card]:
         """ Returns a set of cards the player can legally defend with. """
         if not atk_card:
             return set()
-        return {card for card in self.cards if self.can_beat(atk_card, card)}
-
+        return {card for card in self.cards if self.can_beat(game, atk_card, card)}
 
     def card_match(self, card_1: Card, card_2: Card) -> bool:
         if card_1 is None or card_2 is None:
             return False
         return card_1.value == card_2.value
     
-
-    def can_add_to_field(self, card: Card) -> bool:
+    def can_add_to_field(self, game: Game, card: Card) -> bool:
         """ Determines if the player can add a specific card to the field. """
-        # The defender can never add cards.
-        if self == self.game.opponent_player:
+        if self == game.opponent_player:
             return False
 
-        field = self.game.field
+        if not game.field:
+            return self == game.current_player
 
-        # If the field is empty, only the main attacker can start.
-        if not field:
-            return self == self.game.current_player
-
-        # If the field is not empty, any non-defender can add a card if it matches rank.
-        all_field_cards = self.game.attacking_cards + self.game.defending_cards
+        all_field_cards = game.attacking_cards + game.defending_cards
         field_values = {c.value for c in all_field_cards if c}
-
         return card.value in field_values
 
-
-    def can_beat(self, atk_card: Card, def_card: Card) -> bool:
-        # Convert card values to integers for correct comparison
+    def can_beat(self, game: Game, atk_card: Card, def_card: Card) -> bool:
         def_card_value = int(def_card.value)
         atk_card_value = int(atk_card.value)
 
-        if def_card.suit == self.game.trump:
-            # A trump card can beat any non-trump, or a lower-ranking trump
-            return (atk_card.suit != self.game.trump) or (def_card_value > atk_card_value)
-        
+        if def_card.suit == game.trump:
+            return (atk_card.suit != game.trump) or (def_card_value > atk_card_value)
         elif def_card.suit == atk_card.suit:
-            # A non-trump card can only beat a lower-ranking card of the same suit
             return def_card_value > atk_card_value
-        
         else:
-            # Different non-trump suits cannot beat each other
             return False
-
 
     def remove_card(self, card: Card):
         if card in self.cards:
             self.cards.remove(card)
         else:
-            self.logger.warning(f"Attempted to remove card {card} not in player's hand for user {self.id}")
+            logger.warning(f"Attempted to remove card {card} not in player's hand for user {self.id}")
 
     def __repr__(self) -> str:
         return f"<Player id={self.id} name='{self.first_name}'>"
     
-
     def __str__(self) -> str:
         return self.first_name

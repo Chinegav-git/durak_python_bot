@@ -38,8 +38,8 @@ async def start_inline_handler(callback_query: types.CallbackQuery):
         opponent = game.opponent_player
         text = (
             f'🎯 <b>Початок раунду</b>\n\n'
-            f'⚔️ <b>Атакує:</b> {current.get_mention(as_html=True)} 🃏 {len(current.cards)} карт\n'
-            f'🛡️ <b>Захищається:</b> {opponent.get_mention(as_html=True)} 🃏 {len(opponent.cards)} карт\n\n'
+            f'⚔️ <b>Атакує:</b> {current.mention} 🃏 {len(current.cards)} карт\n'
+            f'🛡️ <b>Захищається:</b> {opponent.mention} 🃏 {len(opponent.cards)} карт\n\n'
             f'🎯 <b>Козир:</b> {game.deck.trump_ico}\n'
         )
         await bot.send_message(chat.id, text, reply_markup=types.InlineKeyboardMarkup(inline_keyboard=CHOISE))

@@ -31,7 +31,7 @@ async def join_inline_handler(callback_query: types.CallbackQuery):
         await bot.answer_callback_query(callback_query.id, f'👋 {user.first_name} приєднався до гри!')
         
         players_list = '\n'.join([
-            f'{i+1}. {player.user.get_mention(as_html=True)}'
+            f'{i+1}. {player.mention}'
             for i, player in enumerate(game.players)
         ])
         
@@ -44,7 +44,7 @@ async def join_inline_handler(callback_query: types.CallbackQuery):
                 chat_id=callback_query.message.chat.id,
                 message_id=callback_query.message.message_id,
                 text=f'🎮 Гру створено!\n'
-                     f'👤 Засновник: {game.creator.get_mention(as_html=True)}\n\n'
+                     f'👤 Засновник: {game.creator.mention}\n\n'
                      f'<b>Гравці:</b>\n{players_list}\n\n'
                      f'Використовуйте кнопки нижче для керування грою:',
                 reply_markup=keyboard

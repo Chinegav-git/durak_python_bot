@@ -1,44 +1,43 @@
 from aiogram import types
-from typing import Optional
+from typing import Optional, Tuple
 
 from loader import bot, dp, gm
-from durak.objects import * # This will import NoGameInChatError from durak.objects.errors
-from durak.logic import actions, result
+from durak.objects import Game, Player, NoGameInChatError
+from durak.logic import actions
 
-
-async def get_player_for_user(user: types.User) -> Optional[Player]:
-    """Finds the player object for a given user across all active games."""
-    for game_id in await gm.get_all_games():
-        game = await gm.get_game(game_id)
-        if not game:
+async def get_player_and_game_for_user(user: types.User) -> Tuple[Optional[Player], Optional[Game]]:
+    """Finds the player and their game object for a given user across all active games."""
+    # This is an assumption based on how GameManager might work with Redis.
+    # A more efficient implementation would be a user_id -> game_id mapping in Redis.
+    game_keys = await gm.redis.keys("game:*")
+    for key in game_keys:
+        try:
+            chat_id = int(key.decode().split(":", 1)[1])
+            game = await gm.get_game_from_chat(chat_id)
+            if game:
+                player = game.player_for_id(user.id)
+                if player:
+                    return player, game
+        except (NoGameInChatError, IndexError, ValueError):
             continue
-        for player in game.players:
-            if player.user.id == user.id:
-                return player
-    return None
+    return None, None
 
-
-async def send_cheat_att(player: Player):
-    chat = player.game.chat
-    user = player.user
+async def send_cheat_att(game: Game, player: Player):
     await bot.send_message(
-            chat.id,
-            text = f"🚫 Спроба шахраювати {user.get_mention(as_html=True)}"
-        )
-
+        game.id,
+        text=f"🚫 Спроба шахраювати {player.mention}"
+    )
 
 @dp.chosen_inline_handler()
 async def result_handler(query: types.ChosenInlineResult):
-    ''' Inline process '''
+    """ Inline process """ 
     user = query.from_user
-    player = await get_player_for_user(user)
+    player, game = await get_player_and_game_for_user(user)
 
-    if player is None or not player.game.started:
+    if player is None or game is None or not game.started:
         return
 
-    game = player.game
     result_id = query.result_id
-    chat = game.chat
 
     if result_id in ('hand', 'gameinfo', 'nogame'):
         return
@@ -48,33 +47,31 @@ async def result_handler(query: types.ChosenInlineResult):
         result_id, anti_cheat = result_id.split(':')
         split_result_id = result_id.split('-')
         last_anti_cheat = player.anti_cheat
-        # This part is tricky with async, as player object might be stale
-        # A lock per player might be needed for complex state changes
-        # For now, we assume simple increment is okay
+        
+        # Increment anti-cheat and save immediately to prevent race conditions
         player.anti_cheat += 1
-        await gm.save_game(game) # Save the updated anti_cheat
+        await gm.save_game(game)
 
         if int(anti_cheat) != last_anti_cheat:
-            # await send_cheat_att(player)
-            return # Ignore old queries
+            return  # Ignore old queries
     except (ValueError, IndexError):
-        await send_cheat_att(player) # Invalid format
+        await send_cheat_att(game, player)  # Invalid format
         return
 
     field_cards = set(game.attacking_cards) | set(game.defending_cards)
 
     if result_id.startswith('mode_'):
-        mode = result_id[5:]
+        # mode = result_id[5:] # This logic seems incomplete, ignoring for now
         return
     
     elif len(result_id) == 36:  # UUID result, ignore
         return
     
     elif result_id == 'draw':
-        await actions.do_draw(player)
+        await actions.do_draw(game, player)
 
     elif result_id == 'pass':
-        await actions.do_pass(player)
+        await actions.do_pass(game, player)
     
     elif len(split_result_id) == 1:  # ATTACK
         try:
@@ -91,13 +88,13 @@ async def result_handler(query: types.ChosenInlineResult):
         if not (player == game.current_player or player == game.support_player):
             return
 
-        if not player.can_add_to_field(atk_card) or \
+        if not player.can_add_to_field(game, atk_card) or \
            (player == game.current_player and not game.allow_atack) or \
            (player == game.support_player and not game.allow_support_attack) or \
            atk_card in field_cards:
             return
             
-        await actions.do_attack_card(player, atk_card)
+        await actions.do_attack_card(game, player, atk_card)
 
     elif len(split_result_id) == 2:  # DEFEND
         if player != game.opponent_player:
@@ -113,9 +110,9 @@ async def result_handler(query: types.ChosenInlineResult):
         except Exception:
             return
 
-        if not player.can_beat(atk_card, def_card) or \
+        if not player.can_beat(game, atk_card, def_card) or \
            game.field.get(atk_card) is not None or \
            def_card in field_cards:
             return
 
-        await actions.do_defence_card(player, atk_card, def_card)
+        await actions.do_defence_card(game, player, atk_card, def_card)

@@ -53,6 +53,6 @@ async def kick_handler(message: types.Message):
         await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}.\n🎮 Гра завершена, оскільки не залишилося гравців!')
     else:
         if game.started:
-            await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}.\n🎯 Хід робить гравець {game.current_player.get_mention(as_html=True)}')
+            await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}.\n🎯 Хід робить гравець {game.current_player.mention}')
         else:
             await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention} з лоббі!')
