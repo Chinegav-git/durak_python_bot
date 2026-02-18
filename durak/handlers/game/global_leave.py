@@ -1,48 +1,52 @@
-
 from aiogram import types
 from aiogram.dispatcher.filters import Command
 from loader import bot, dp, gm, Commands
 import durak.logic.actions as a
-from durak.objects import *
-from pony.orm import db_session
+from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
-@dp.message_handler(Command(Commands.GLEAVE), chat_type=['group', 'supergroup'])
+@dp.message_handler(Command(Commands.GLEAVE))
 async def global_leave_handler(message: types.Message):
     """ Global leave from any game """
-    user = types.User.get_current()
+    user = message.from_user
     
-    player_to_leave = None
-    game_to_leave = None
-
-    # Find the player and game across all active games
-    for game in gm.games.values():
-        for player in game.players:
-            if player.id == user.id:
-                player_to_leave = player
-                game_to_leave = game
-                break
-        if game_to_leave:
-            break
-
-    if not player_to_leave or not game_to_leave:
+    game_id = await gm.get_user_game_id(user.id)
+    if not game_id:
         await message.answer('🚫 Ви не граєте в жодній грі!')
+        return
+
+    try:
+        game = await gm.get_game_from_chat(game_id)
+    except NoGameInChatError:
+        # This case should ideally not happen if the user_game key is consistent
+        await gm.redis.delete(gm._user_game_key(user.id)) # Clean up inconsistent state
+        await message.answer('🚫 Помилка: гри, в якій ви брали участь, не знайдено. Ваш статус оновлено.')
+        return
+
+    player = game.player_for_id(user.id)
+    if not player:
+        # This case should also ideally not happen
+        await gm.redis.delete(gm._user_game_key(user.id)) # Clean up inconsistent state
+        await message.answer('🚫 Помилка: вас не знайдено в грі, в якій ви нібито берете участь. Ваш статус оновлено.')
         return
     
     mention = user.get_mention(as_html=True)
 
     try:
-        # The action now correctly updates the DB
-        await a.do_leave_player(player_to_leave)
-        await message.answer(f'👋 ({mention}) - Ви успішно покинули гру в іншому чаті!')
+        await a.do_leave_player(game, player)
+        await message.answer(f'👋 Ви успішно покинули гру в чаті "{game.chat_title_or_id()}"!')
 
     except NotEnoughPlayersError:
-        # end_game handles all cleanup
-        await gm.end_game(game_to_leave.chat)
-        await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) гру!')
-        await bot.send_message(game_to_leave.chat.id, '🎮 Гра завершена, оскільки не залишилося гравців!')
-        await message.answer(f'👋 ({mention}) - Ви успішно покинули гру в іншому чаті, і вона була завершена.')
+        await gm.end_game(game)
+        await bot.send_message(game.id, f'👋 {mention} покинув(ла) гру!\n🎮 Гра завершена, оскільки не залишилося гравців.')
+        await message.answer(f'👋 Ви успішно покинули гру, і її було завершено, оскільки ви були останнім гравцем.')
+    
+    except Exception as e:
+        await message.answer(f"Сталася несподівана помилка: {e}")
+
     else:
-        if game_to_leave.started:
-            await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) гру\n🎯 Хід робить гравець {game_to_leave.current_player.mention}')
-        else:
-            await bot.send_message(game_to_leave.chat.id, f'👋 ({mention}) - Покинув(ла) лобі!')
+        # Notify other players in the game chat
+        if game.id != message.chat.id: # Avoid double notification
+            if game.started:
+                await bot.send_message(game.id, f'👋 {mention} покинув(ла) гру.\n🎯 Хід робить гравець {game.current_player.mention}')
+            else:
+                await bot.send_message(game.id, f'👋 {mention} покинув(ла) лоббі!')

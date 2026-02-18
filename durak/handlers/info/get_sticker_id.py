@@ -1,7 +1,7 @@
 
 from aiogram import types
 from loader import dp
-from durak.db.chat_settings import get_chat_settings
+from durak.db.models.chat_settings import ChatSetting
 
 @dp.message_handler(content_types=types.ContentType.STICKER, chat_type=['group', 'supergroup'])
 async def get_sticker_id(message: types.Message):
@@ -10,7 +10,7 @@ async def get_sticker_id(message: types.Message):
     если в настройках чата включена соответствующая опция.
     Только для администраторов.
     """
-    settings = get_chat_settings(message.chat.id)
+    settings, _ = await ChatSetting.get_or_create(id=message.chat.id)
     
     # 1. Проверяем, включена ли функция в настройках чата
     if not settings.sticker_id_helper:

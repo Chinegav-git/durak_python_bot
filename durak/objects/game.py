@@ -28,7 +28,7 @@ class Game:
 
         self.creator_id: int = creator_id
         self.players: List[Player] = [
-            Player(self, creator_id, creator_first_name, creator_username)
+            Player(creator_id, creator_first_name, creator_username)
         ]
 
         self.attacker_index: int = 0

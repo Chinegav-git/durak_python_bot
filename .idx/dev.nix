@@ -8,6 +8,8 @@
     # pkgs.go
     pkgs.python314
     pkgs.uv
+    pkgs.python314Packages.tortoise-orm
+    pkgs.python314Packages.aiosqlite
     # pkgs.python311Packages.pip
     # pkgs.nodejs_20
     # pkgs.nodePackages.nodemon

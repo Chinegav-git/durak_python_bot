@@ -13,10 +13,12 @@ magic-filter==1.0.12
 marshmallow==3.19.0
 multidict==6.7.1
 packaging==26.0
-pony==0.7.19
 propcache==0.4.1
 python-dotenv==1.2.1
 pytz==2025.2
 typing_extensions==4.15.0
 yarl==1.22.0
 redis==5.0.4
+tortoise-orm==0.19.3
+aerich==0.7.1
+asyncpg==0.27.0

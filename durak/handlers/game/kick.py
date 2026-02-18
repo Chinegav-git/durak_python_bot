@@ -1,4 +1,3 @@
-
 from aiogram import types
 from aiogram.dispatcher.filters import Command
 from loader import bot, dp, gm, Commands
@@ -7,6 +6,7 @@ import durak.logic.actions as a
 from durak.logic.utils import (
     user_is_creator_or_admin
 )
+from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
 @dp.message_handler(Command(Commands.KICK), chat_type=['group', 'supergroup'])
 async def kick_handler(message: types.Message):
@@ -46,8 +46,7 @@ async def kick_handler(message: types.Message):
     kicker_mention = message.from_user.get_mention(as_html=True)
 
     try:
-        # The action handles DB updates and game state
-        await a.do_leave_player(kicked_player)
+        await a.do_leave_player(game, kicked_player)
     except NotEnoughPlayersError:
         await gm.end_game(chat)
         await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}.\n🎮 Гра завершена, оскільки не залишилося гравців!')

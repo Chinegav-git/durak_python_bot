@@ -1,9 +1,8 @@
 import os
 from aiogram import types
 from aiogram.dispatcher.filters import Command
-from pony.orm import db_session
 
-from durak.db.chat_settings import ChatSetting
+from durak.db.models.chat_settings import ChatSetting
 from loader import dp
 from durak.handlers.settings import settings_cd
 
@@ -16,13 +15,13 @@ def get_available_themes():
         if f.endswith('.py') and not f.startswith('__')
     ])
 
-def get_card_theme_keyboard(chat_id):
+async def get_card_theme_keyboard(chat_id):
     """
     Generates the keyboard for card theme settings.
     Marks the current theme.
     """
-    with db_session:
-        current_theme = ChatSetting.get_or_create(chat_id).card_theme
+    cs, _ = await ChatSetting.get_or_create(id=chat_id)
+    current_theme = cs.card_theme
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     buttons = []
@@ -47,9 +46,8 @@ async def set_card_theme(message: types.Message):
     """
     Forwards user to the settings menu
     """
-    with db_session:
-        chat_setting = ChatSetting.get_or_create(message.chat.id)
-        current_theme = chat_setting.card_theme
+    chat_setting, _ = await ChatSetting.get_or_create(id=message.chat.id)
+    current_theme = chat_setting.card_theme
 
     await message.answer(
         f"Поточна тема карт: `{current_theme}`.\n\n"
@@ -65,7 +63,7 @@ async def show_card_theme_settings(call: types.CallbackQuery):
     """
     await call.message.edit_text(
         "🎨 **Тема карт**\n\nОберіть зовнішній вигляд карт:",
-        reply_markup=get_card_theme_keyboard(call.message.chat.id)
+        reply_markup=await get_card_theme_keyboard(call.message.chat.id)
     )
     await call.answer()
 
@@ -78,15 +76,15 @@ async def set_card_theme_callback(call: types.CallbackQuery, callback_data: dict
     new_theme = callback_data.get("value")
     chat_id = call.message.chat.id
 
-    with db_session:
-        chat_setting = ChatSetting.get_or_create(chat_id)
-        if chat_setting.card_theme != new_theme:
-            chat_setting.card_theme = new_theme
-            await call.answer(f"✅ Тему змінено на {new_theme.capitalize()}")
-        else:
-            await call.answer("Ця тема вже встановлена")
+    chat_setting, _ = await ChatSetting.get_or_create(id=chat_id)
+    if chat_setting.card_theme != new_theme:
+        chat_setting.card_theme = new_theme
+        await chat_setting.save()
+        await call.answer(f"✅ Тему змінено на {new_theme.capitalize()}")
+    else:
+        await call.answer("Ця тема вже встановлена")
 
     # Update the keyboard to show the new current theme
     await call.message.edit_reply_markup(
-        reply_markup=get_card_theme_keyboard(chat_id)
+        reply_markup=await get_card_theme_keyboard(chat_id)
     )

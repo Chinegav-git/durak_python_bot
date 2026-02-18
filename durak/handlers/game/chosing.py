@@ -9,7 +9,7 @@ from pony.orm import db_session
 from durak.objects.card import get_sticker_id, Card
 from durak.objects.errors import NoGameInChatError
 from loader import bot, dp, gm
-from durak.db import UserSetting
+from durak.db import ChatSetting
 from durak.objects import Game, Player
 
 
@@ -70,10 +70,10 @@ async def inline_handler(query: types.InlineQuery):
 
     if is_defending:
         cards = _get_defending_cards(game, player, from_card_str)
-        await _answer_with_cards(query, player, cards, from_card_str)
+        await _answer_with_cards(query, player, cards, game, from_card_str)
     else:
         cards = _get_attacking_cards(game, player)
-        await _answer_with_cards(query, player, cards)
+        await _answer_with_cards(query, player, cards, game)
 
 
 def _get_attacking_cards(game: Game, player: Player) -> List[Card]:
@@ -88,14 +88,14 @@ def _get_defending_cards(game: Game, player: Player, from_card_str: str) -> List
         return []
 
 @db_session
-def _get_user_card_settings(user_id: int):
-    us = UserSetting.get(user_id)
-    theme = us.card_theme if us else 'classic'
-    mode = us.display_mode if us else 'text_and_sticker'
+def _get_chat_card_settings(chat_id: int):
+    cs = ChatSetting.get(id=chat_id)
+    theme = cs.card_theme if cs else 'classic'
+    mode = cs.display_mode if cs else 'text_and_sticker'
     return theme, mode
 
-async def _answer_with_cards(query: types.InlineQuery, player: Player, cards: List[Card], from_card_str: str = ''):
-    theme, mode = _get_user_card_settings(player.id)
+async def _answer_with_cards(query: types.InlineQuery, player: Player, cards: List[Card], game: Game, from_card_str: str = ''):
+    theme, mode = _get_chat_card_settings(game.id)
     results = []
     anti_cheat_token = player.anti_cheat
 

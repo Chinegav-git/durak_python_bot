@@ -1,28 +1,26 @@
 from aiogram import types
-from pony.orm import db_session
 
-from durak.db import UserSetting
+from durak.db.user_settings import UserSetting
 from loader import dp
 from durak.handlers.settings import settings_cd
 
-def get_stats_text_and_keyboard(user_id):
+async def get_stats_text_and_keyboard(user_id):
     """
     Generates the text and keyboard for the statistics menu.
     """
-    with db_session:
-        us = UserSetting.get_or_create(user_id)
-        stat_status_icon = "✅" if us.stats else "❌"
-        stat_status_text = "Увімкнений" if us.stats else "Вимкнений"
-        
-        win_percentage = round((us.first_places / us.games_played) * 100) if us.games_played else 0
-        
-        text = (
-            f"📊 **Ваша статистика**\n\n"
-            f"- Статус збору: **{stat_status_text}**\n"
-            f"- Перемоги: **{us.first_places}** / {us.games_played} ({win_percentage}%)\n"
-            f"- Зроблено ходів: {us.cards_played}\n"
-            f"- Відбито карт: {us.cards_beaten}"
-        )
+    us, _ = await UserSetting.get_or_create(id=user_id)
+    stat_status_icon = "✅" if us.stats else "❌"
+    stat_status_text = "Увімкнений" if us.stats else "Вимкнений"
+    
+    win_percentage = round((us.first_places / us.games_played) * 100) if us.games_played else 0
+    
+    text = (
+        f"📊 **Ваша статистика**\n\n"
+        f"- Статус збору: **{stat_status_text}**\n"
+        f"- Перемоги: **{us.first_places}** / {us.games_played} ({win_percentage}%)\n"
+        f"- Зроблено ходів: {us.cards_atack}\n"
+        f"- Відбито карт: {us.cards_beaten}"
+    )
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(types.InlineKeyboardButton(
@@ -41,7 +39,7 @@ async def show_stats_settings(call: types.CallbackQuery):
     Shows the statistics menu.
     """
     user_id = call.from_user.id
-    text, markup = get_stats_text_and_keyboard(user_id)
+    text, markup = await get_stats_text_and_keyboard(user_id)
     
     await call.message.edit_text(text, reply_markup=markup)
     await call.answer()
@@ -53,13 +51,13 @@ async def toggle_stats_callback(call: types.CallbackQuery):
     """
     user_id = call.from_user.id
 
-    with db_session:
-        us = UserSetting.get_or_create(user_id)
-        us.stats = not us.stats
-        new_status = "увімкнено" if us.stats else "вимкнено"
+    us, _ = await UserSetting.get_or_create(id=user_id)
+    us.stats = not us.stats
+    await us.save()
     
+    new_status = "увімкнено" if us.stats else "вимкнено"
     await call.answer(f"✅ Збір статистики {new_status}")
 
     # Update the message with new stats info
-    text, markup = get_stats_text_and_keyboard(user_id)
+    text, markup = await get_stats_text_and_keyboard(user_id)
     await call.message.edit_text(text, reply_markup=markup)

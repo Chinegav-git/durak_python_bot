@@ -36,9 +36,8 @@ def add_not_started(results: List[InlineQueryResult]):
     )
 
 
-def add_draw(player: Player, results: List[InlineQueryResult], theme_name: str):
+def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme_name: str):
     """Add option to draw"""
-    game = player.game
     sticker_id = c.get_sticker_id('draw', theme_name)
     if not sticker_id:
         return # Or add a default text representation
@@ -47,7 +46,7 @@ def add_draw(player: Player, results: List[InlineQueryResult], theme_name: str):
         Sticker(
             id="draw", sticker_file_id=sticker_id,
             input_message_content=
-            InputTextMessageContent(f"🎴 {player.user.get_mention(as_html=True)} взяв(а) карти!")
+            InputTextMessageContent(f"🎴 {player.mention} взяв(ла) карти!")
         )
     )
 
@@ -133,14 +132,14 @@ def game_info(game: Game):
     trump = game.trump
     count_cards_in_deck = len(game.deck.cards)
 
-    pleyers_info = ''.join(f"\n👤 {len(pl.cards)} 🃏 | {pl.user.get_mention(as_html=True)}" for pl in players)
+    pleyers_info = ''.join(f"\n👤 {len(pl.cards)} 🃏 | {pl.mention}" for pl in players)
     
     field_info = ''.join(f'\n  {str(a)} ◄-- {str(d) if not d is None else "❌"}' for a, d in field.items())
 
     return InputTextMessageContent(
         f"<b>🎮 Інформація про гру</b>\n\n"
-        f"⚔️ <b>Атакуючий:</b> {game.current_player.user.get_mention(as_html=True)} 🃏 {len(game.current_player.cards)} карт\n"
-        f"🛡️ <b>Захисник:</b> {game.opponent_player.user.get_mention(as_html=True)} 🃏 {len(game.opponent_player.cards)} карт\n\n"
+        f"⚔️ <b>Атакуючий:</b> {game.current_player.mention} 🃏 {len(game.current_player.cards)} карт\n"
+        f"🛡️ <b>Захисник:</b> {game.opponent_player.mention} 🃏 {len(game.opponent_player.cards)} карт\n\n"
         f"🎯 <b>Козир:</b> {game.deck.trump_ico}\n"
         f"📦 <b>В колоді:</b> {len(game.deck.cards)} карт\n\n"
         f"<b>👥 Гравці:</b>{pleyers_info}\n"

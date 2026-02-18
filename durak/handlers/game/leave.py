@@ -1,10 +1,8 @@
-
 from aiogram import types
 from aiogram.dispatcher.filters import Command
 from loader import dp, gm, Commands
 import durak.logic.actions as a
-from durak.objects import NoGameInChatError
-from durak.logic.actions import NotEnoughPlayersError
+from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
 @dp.message_handler(Command(Commands.LEAVE), chat_type=['group', 'supergroup'])
 async def leave_handler(message: types.Message):
@@ -25,10 +23,8 @@ async def leave_handler(message: types.Message):
         return
 
     try:
-        # This action now needs to handle the DB update
-        await a.do_leave_player(player)
+        await a.do_leave_player(game, player)
     except NotEnoughPlayersError:
-        # end_game now handles all DB updates for all players
         await gm.end_game(chat)
         await message.answer('🎮 Гра завершена, оскільки гравців не залишилося!')
     else:

@@ -2,14 +2,13 @@
 from aiogram import types
 from aiogram.dispatcher.filters import Command
 from aiogram.utils.callback_data import CallbackData
-from pony.orm import db_session
 
-from durak.db.chat_settings import ChatSetting, get_chat_settings
+from durak.db.models.chat_settings import ChatSetting
 from loader import dp
 
 settings_cd = CallbackData("settings", "level", "value")
 
-def get_main_settings_keyboard(chat_id: int, is_admin: bool):
+async def get_main_settings_keyboard(chat_id: int, is_admin: bool):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(types.InlineKeyboardButton(
         text="✍️ Режим гри",
@@ -26,7 +25,7 @@ def get_main_settings_keyboard(chat_id: int, is_admin: bool):
 
     # Показуємо кнопку тільки адміністраторам
     if is_admin:
-        settings = get_chat_settings(chat_id)
+        settings, _ = await ChatSetting.get_or_create(id=chat_id)
         sticker_helper_status = "✅" if settings.sticker_id_helper else "❌"
         markup.add(types.InlineKeyboardButton(
             text=f"Sticker ID Helper: {sticker_helper_status}",
@@ -40,7 +39,7 @@ async def show_settings(message: types.Message):
     # Тепер команда доступна всім, але клавіатура залежить від статусу адміна
     await message.answer(
         "⚙️ **Налаштування**", 
-        reply_markup=get_main_settings_keyboard(message.chat.id, user.is_chat_admin())
+        reply_markup=await get_main_settings_keyboard(message.chat.id, user.is_chat_admin())
     )
 
 @dp.callback_query_handler(settings_cd.filter(level="main_menu"))
@@ -49,7 +48,7 @@ async def show_main_menu(call: types.CallbackQuery):
     # При поверненні в головне меню також генеруємо правильну клавіатуру
     await call.message.edit_text(
         "⚙️ **Налаштування**", 
-        reply_markup=get_main_settings_keyboard(call.message.chat.id, user.is_chat_admin())
+        reply_markup=await get_main_settings_keyboard(call.message.chat.id, user.is_chat_admin())
     )
     await call.answer()
 
@@ -60,14 +59,12 @@ async def toggle_sticker_helper(call: types.CallbackQuery):
     if not user.is_chat_admin():
         return await call.answer("Ця дія доступна лише адміністраторам чату.", show_alert=True)
 
-    with db_session:
-        settings = ChatSetting.get(call.message.chat.id)
-        if not settings:
-            settings = ChatSetting(call.message.chat.id)
-        settings.sticker_id_helper = not settings.sticker_id_helper
+    settings, _ = await ChatSetting.get_or_create(id=call.message.chat.id)
+    settings.sticker_id_helper = not settings.sticker_id_helper
+    await settings.save()
 
     # Оновлюємо клавіатуру, щоб показати новий статус
     await call.message.edit_reply_markup(
-        reply_markup=get_main_settings_keyboard(call.message.chat.id, user.is_chat_admin())
+        reply_markup=await get_main_settings_keyboard(call.message.chat.id, user.is_chat_admin())
     )
     await call.answer()

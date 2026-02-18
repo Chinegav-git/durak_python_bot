@@ -1,16 +1,16 @@
-
 import asyncio
+import logging
 from contextlib import suppress
 from aiogram import types, Bot
-from pony.orm import db_session
 
 from loader import gm, CHOISE
-from ..db import ChatSetting, UserSetting
+from ..db.user_settings import UserSetting
+from ..db.chat_settings import ChatSetting
 from ..objects import Game, Player, Card
 from ..objects import card as c
+from ..objects.errors import NotAllowedMove, NotEnoughPlayersError, NoGameInChatError
 
-class NotEnoughPlayersError(Exception):
-    pass
+logger = logging.getLogger(__name__)
 
 async def _delete_message_after_delay(chat_id: int, message_id: int, delay: int):
     await asyncio.sleep(delay)
@@ -59,14 +59,14 @@ async def send_no_more_attacks_notification(game: Game):
     if msg:
         asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 10))
 
-@db_session
-def _update_win_stats(user_id: int):
-    us = UserSetting.get(user_id)
+async def _update_win_stats(user_id: int):
+    us = await UserSetting.get_or_none(id=user_id)
     if us and us.stats:
         us.first_places += 1
+        await us.save()
 
 async def win(game: Game, player: Player):
-    await asyncio.to_thread(_update_win_stats, player.id)
+    await _update_win_stats(player.id)
     
     if not hasattr(game, 'winners'):
         game.winners = []
@@ -85,10 +85,11 @@ async def win(game: Game, player: Player):
 async def do_turn(game: Game, skip_def: bool = False):
     while True:
         if game.game_is_over:
-            if await gm.get_game_from_chat(game.id):
-                final_text = gm.get_game_end_message(game)
-                await gm.end_game(game)
-                await Bot.get_current().send_message(game.id, final_text, reply_markup=types.ReplyKeyboardRemove())
+            with suppress(NoGameInChatError): # suppress error if game already deleted
+                if await gm.get_game_from_chat(game.id): # Check if game still exists
+                    final_text = gm.get_game_end_message(game)
+                    await gm.end_game(game)
+                    await Bot.get_current().send_message(game.id, final_text, reply_markup=types.ReplyKeyboardRemove())
             return
 
         player_has_left = False
@@ -109,27 +110,19 @@ async def do_turn(game: Game, skip_def: bool = False):
     if not skip_def:
         await send_turn_notification(game)
 
-@db_session
-def _update_leave_stats(user_id: int):
-    us = UserSetting.get(user_id)
-    if us and us.stats:
-        us.games_played += 1
-
 async def do_leave_player(game: Game, player: Player, from_turn: bool = False):
-    if not game.started:
-        if player in game.players:
-            game.players.remove(player)
-        await gm.save_game(game)
-        return
+    """
+    Processes a player leaving the game.
+    This action calls the GameManager to handle state changes and then advances the turn.
+    NotEnoughPlayersError is caught by the message handlers (e.g., leave, kick).
+    """
+    await gm.leave_game(game, player)
 
-    await asyncio.to_thread(_update_leave_stats, player.id)
-    player.leave(game)
-    player.finished_game = True
+    if not game.started:
+        return
 
     if not from_turn:
         was_defender = (game.opponent_player and player.id == game.opponent_player.id)
-        if len([p for p in game.players if not p.finished_game]) < 2:
-            raise NotEnoughPlayersError("Not enough players to continue")
         await do_turn(game, skip_def=was_defender)
 
 async def do_pass(game: Game, player: Player):
@@ -148,6 +141,9 @@ async def do_pass(game: Game, player: Player):
         await do_turn(game)
 
 async def do_draw(game: Game, player: Player):
+    if not game.opponent_player or player.id != game.opponent_player.id:
+        return
+
     bot = Bot.get_current()
 
     for msg_id in list(game.attack_announce_message_ids.values()):
@@ -176,27 +172,31 @@ async def do_draw(game: Game, player: Player):
     reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
     await bot.send_message(game.id, text, reply_markup=reply_markup)
 
-@db_session
-def _get_attack_settings(chat_id: int, user_id: int):
-    cs = ChatSetting.get(chat_id)
-    us = UserSetting.get(user_id)
-    if us and us.stats:
+async def _get_attack_settings(chat_id: int, user_id: int):
+    cs, _ = await ChatSetting.get_or_create(id=chat_id)
+    us, _ = await UserSetting.get_or_create(id=user_id)
+    
+    if us.stats:
         us.cards_atack += 1
-    display_mode = cs.display_mode if cs else 'text'
-    theme_name = cs.card_theme if cs else 'classic'
-    return display_mode, theme_name
+        await us.save()
+    
+    return cs.display_mode, cs.card_theme
 
 async def do_attack_card(game: Game, player: Player, card: Card):
+    try:
+        player.play_attack(game, card)
+    except NotAllowedMove as e:
+        logger.warning(f"Player {player.id} tried to make an illegal move: {e}")
+        return
+
     bot = Bot.get_current()
-    display_mode, theme_name = await asyncio.to_thread(_get_attack_settings, game.id, player.id)
+    display_mode, theme_name = await _get_attack_settings(game.id, player.id)
 
     if player == game.current_player:
         game.is_pass = False
 
     if player not in game.round_attackers:
         game.round_attackers.append(player)
-
-    player.play_attack(game, card)
 
     if not player.cards and len(game.players) <= 2 and not game.deck.cards:
         game.is_final = True
@@ -227,17 +227,21 @@ async def do_attack_card(game: Game, player: Player, card: Card):
             game.attack_announce_message_ids[card] = msg.message_id
             await gm.save_game(game)
 
-@db_session
-def _update_defense_stats(user_id: int):
-    us = UserSetting.get(user_id)
+async def _update_defense_stats(user_id: int):
+    us = await UserSetting.get_or_none(id=user_id)
     if us and us.stats:
         us.cards_beaten += 1
+        await us.save()
 
 async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: Card):
+    try:
+        player.play_defence(game, atk_card, def_card)
+    except NotAllowedMove as e:
+        logger.warning(f"Player {player.id} tried to make an illegal move: {e}")
+        return
+        
     bot = Bot.get_current()
-
-    player.play_defence(game, atk_card, def_card)
-    await asyncio.to_thread(_update_defense_stats, player.id)
+    await _update_defense_stats(player.id)
 
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)
     if announce_id:
