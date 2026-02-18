@@ -89,7 +89,7 @@ def _get_defending_cards(game: Game, player: Player, from_card_str: str) -> List
 
 @db_session
 def _get_user_card_settings(user_id: int):
-    us = UserSetting.get(id=user_id)
+    us = UserSetting.get(user_id)
     theme = us.card_theme if us else 'classic'
     mode = us.display_mode if us else 'text_and_sticker'
     return theme, mode

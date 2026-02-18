@@ -61,9 +61,9 @@ async def toggle_sticker_helper(call: types.CallbackQuery):
         return await call.answer("Ця дія доступна лише адміністраторам чату.", show_alert=True)
 
     with db_session:
-        settings = ChatSetting.get(id=call.message.chat.id)
+        settings = ChatSetting.get(call.message.chat.id)
         if not settings:
-            settings = ChatSetting(id=call.message.chat.id)
+            settings = ChatSetting(call.message.chat.id)
         settings.sticker_id_helper = not settings.sticker_id_helper
 
     # Оновлюємо клавіатуру, щоб показати новий статус

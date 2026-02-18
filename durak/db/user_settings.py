@@ -14,7 +14,7 @@ class UserSetting(db.Entity):
 
     @staticmethod
     def get_or_create(user_id):
-        user_setting = UserSetting.get(id=user_id)
+        user_setting = UserSetting.get(user_id)
         if not user_setting:
-            user_setting = UserSetting(id=user_id)
+            user_setting = UserSetting(user_id)
         return user_setting

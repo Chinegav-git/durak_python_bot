@@ -37,7 +37,7 @@ class GameManager:
 
     @db_session
     def _new_game_db_session(self, chat_id: int, user_id: int):
-        chat_setting = ChatSetting.get_or_create(id=chat_id)
+        chat_setting = ChatSetting.get_or_create(chat_id)
         if chat_setting.is_game_active:
             chat_setting.is_game_active = False 
         chat_setting.is_game_active = True
@@ -45,7 +45,7 @@ class GameManager:
 
     @db_session
     def _end_game_db_session(self, chat_id: int, players: List[Player]):
-        chat_setting = ChatSetting.get(id=chat_id)
+        chat_setting = ChatSetting.get(chat_id)
         if chat_setting:
             chat_setting.is_game_active = False
 
@@ -53,14 +53,14 @@ class GameManager:
         self._update_user_playing_status_db_session(player_ids, False)
 
         for pl in players:
-            us = UserSetting.get_or_create(id=pl.id)
+            us = UserSetting.get_or_create(pl.id)
             if us.stats:
                 us.games_played += 1
 
     @db_session
     def _update_user_playing_status_db_session(self, user_ids: List[int], is_playing: bool):
         for user_id in user_ids:
-            user_setting = UserSetting.get_or_create(id=user_id)
+            user_setting = UserSetting.get_or_create(user_id)
             user_setting.is_playing = is_playing
 
     async def is_user_in_any_game(self, user_id: int) -> bool:

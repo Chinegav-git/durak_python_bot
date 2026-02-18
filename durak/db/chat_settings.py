@@ -14,9 +14,9 @@ class ChatSetting(db.Entity):
     @staticmethod
     @db_session
     def get_or_create(chat_id):
-        chat_setting = ChatSetting.get(id=chat_id)
+        chat_setting = ChatSetting.get(chat_id)
         if not chat_setting:
-            chat_setting = ChatSetting(id=chat_id)
+            chat_setting = ChatSetting(chat_id)
         return chat_setting
 
 @db_session

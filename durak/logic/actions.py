@@ -61,7 +61,7 @@ async def send_no_more_attacks_notification(game: Game):
 
 @db_session
 def _update_win_stats(user_id: int):
-    us = UserSetting.get(id=user_id)
+    us = UserSetting.get(user_id)
     if us and us.stats:
         us.first_places += 1
 
@@ -111,7 +111,7 @@ async def do_turn(game: Game, skip_def: bool = False):
 
 @db_session
 def _update_leave_stats(user_id: int):
-    us = UserSetting.get(id=user_id)
+    us = UserSetting.get(user_id)
     if us and us.stats:
         us.games_played += 1
 
@@ -178,8 +178,8 @@ async def do_draw(game: Game, player: Player):
 
 @db_session
 def _get_attack_settings(chat_id: int, user_id: int):
-    cs = ChatSetting.get(id=chat_id)
-    us = UserSetting.get(id=user_id)
+    cs = ChatSetting.get(chat_id)
+    us = UserSetting.get(user_id)
     if us and us.stats:
         us.cards_atack += 1
     display_mode = cs.display_mode if cs else 'text'
@@ -229,7 +229,7 @@ async def do_attack_card(game: Game, player: Player, card: Card):
 
 @db_session
 def _update_defense_stats(user_id: int):
-    us = UserSetting.get(id=user_id)
+    us = UserSetting.get(user_id)
     if us and us.stats:
         us.cards_beaten += 1
 
