@@ -1,17 +1,29 @@
 from tortoise import Tortoise
+from config import Config
+
+TORTOISE_ORM_CONFIG = {
+    "connections": {
+        "default": Config.DATABASE_URL
+    },
+    "apps": {
+        "models": {
+            "models": [
+                "durak.db.user_settings",
+                # "durak.db.chat_settings", # Модель временно отключена
+                "aerich.models"
+            ],
+            "default_connection": "default",
+        },
+    },
+}
 
 async def init_db():
     """
-    Initializes the Tortoise ORM connection to the SQLite database.
+    Initializes the Tortoise ORM connection.
     """
-    await Tortoise.init(
-        db_url="sqlite://durak.sqlite",
-        modules={"models": [
-            "durak.db.user_settings",
-            "durak.db.chat_settings"
-        ]}
-    )
-    await Tortoise.generate_schemas()
+    await Tortoise.init(config=TORTOISE_ORM_CONFIG)
+    if Config.DATABASE_URL.startswith("sqlite"):
+        await Tortoise.generate_schemas()
 
 async def close_db_connection():
     """

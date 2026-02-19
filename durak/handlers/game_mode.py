@@ -1,9 +1,10 @@
-from aiogram import types
-from aiogram.dispatcher.filters import Command
+from aiogram import Router, types, F
+from aiogram.filters import Command
 
-from durak.db.models.chat_settings import ChatSetting
-from loader import dp
-from durak.handlers.settings import settings_cd
+from durak.db.models import ChatSetting
+from durak.handlers.settings import SettingsCallback  # Import from settings
+
+router = Router()
 
 async def get_gamemode_keyboard(chat_id):
     """
@@ -19,23 +20,24 @@ async def get_gamemode_keyboard(chat_id):
         "sticker_and_button": "🕹️ Стікери + Кнопки"
     }
 
-    markup = types.InlineKeyboardMarkup(row_width=1)
+    builder = types.InlineKeyboardBuilder()
 
     for mode_id, mode_name in modes.items():
         text = f"» {mode_name} «" if current_mode == mode_id else mode_name
-        markup.add(types.InlineKeyboardButton(
+        builder.button(
             text=text,
-            callback_data=settings_cd.new(level="gamemode_select", value=mode_id)
-        ))
+            callback_data=SettingsCallback(level="gamemode_select", value=mode_id)
+        )
 
-    markup.add(types.InlineKeyboardButton(
+    builder.button(
         text="⬅️ Назад",
-        callback_data=settings_cd.new(level="main_menu", value="back")
-    ))
-    return markup
+        callback_data=SettingsCallback(level="main_menu", value="back")
+    )
+    builder.adjust(1)
+    return builder.as_markup()
 
 
-@dp.message_handler(Command("gamemode"))
+@router.message(Command("gamemode"))
 async def set_game_mode(message: types.Message):
     """
     Forwards user to the settings menu
@@ -50,7 +52,7 @@ async def set_game_mode(message: types.Message):
     )
 
 
-@dp.callback_query_handler(settings_cd.filter(level="gamemode"))
+@router.callback_query(SettingsCallback.filter(F.level == "gamemode"))
 async def show_gamemode_settings(call: types.CallbackQuery):
     """
     Shows the game mode selection menu.
@@ -62,12 +64,12 @@ async def show_gamemode_settings(call: types.CallbackQuery):
     await call.answer()
 
 
-@dp.callback_query_handler(settings_cd.filter(level="gamemode_select"))
-async def set_gamemode_callback(call: types.CallbackQuery, callback_data: dict):
+@router.callback_query(SettingsCallback.filter(F.level == "gamemode_select"))
+async def set_gamemode_callback(call: types.CallbackQuery, callback_data: SettingsCallback):
     """
     Sets the chosen game mode from a callback.
     """
-    new_mode = callback_data.get("value")
+    new_mode = callback_data.value
     chat_id = call.message.chat.id
 
     chat_setting, _ = await ChatSetting.get_or_create(id=chat_id)

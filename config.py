@@ -7,23 +7,36 @@ from typing import List, Tuple, Dict, ClassVar
 env = Env()
 env.read_env()
 
+# Присваиваем None по умолчанию, чтобы избежать падения при импорте.
+# Явная проверка на наличие переменных будет в bot.py.
+BOT_TOKEN = env.str("BOT_TOKEN", None)
+ADMINS_RAW = env.list("ADMINS", [])
 
-BOT_TOKEN = env.str("BOT_TOKEN")
-ADMINS = list(map(int, env.list("ADMINS")))
+# Обработка списка админов с защитой от неверных данных
+ADMINS = []
+if ADMINS_RAW:
+    try:
+        ADMINS = list(map(int, ADMINS_RAW))
+    except (ValueError, TypeError):
+        # В будущем здесь можно будет добавить логирование
+        print(f"ПРЕДУПРЕЖДЕНИЕ: Переменная окружения ADMINS ('{ADMINS_RAW}') содержит нечисловые значения и будет проигнорирована.")
+
 REDIS_HOST = env.str("REDIS_HOST", "localhost")
 REDIS_PORT = env.int("REDIS_PORT", 6379)
 REDIS_DB = env.int("REDIS_DB", 0)
+DATABASE_URL = env.str("DATABASE_URL", "sqlite://durak.sqlite")
 
 
 @dataclass
 class Config:
     BOT_TOKEN: str = BOT_TOKEN
     ADMINS: ClassVar[List[int]] = ADMINS
+    DATABASE_URL: str = DATABASE_URL
 
     WAITING_TIME: int = 120
     MAX_PLAYERS: int = 6
     COUNT_CARDS_IN_START: int = 6
-    DEFAULT_GAMEMODE: str = "p"  # :> .......
+    DEFAULT_GAMEMODE: str = "p"
     DEBUG: bool = False
 
     # Redis
@@ -49,15 +62,15 @@ class Commands:
     
 
 COMMANDS: List[Tuple[str, str]] = [
-    (Commands.NEW, 'Створити нову гру'),
-    (Commands.JOIN, 'Приєднатися до гри'),
-    (Commands.START, 'Запустити гру'),
-    (Commands.LEAVE, 'Покинути гру або лобі'),
-    (Commands.GLEAVE, 'Покинути гру у всіх чатах'),
-    (Commands.KICK, 'Вигнати гравця'),
-    (Commands.KILL, 'Завершити гру'),
-    (Commands.HELP, 'Допомога по боту'),
+    (Commands.NEW, 'Создать новую игру'),
+    (Commands.JOIN, 'Присоединиться к игре'),
+    (Commands.START, 'Запустить игру'),
+    (Commands.LEAVE, 'Покинуть игру или лобби'),
+    (Commands.GLEAVE, 'Покинуть игру во всех чатах'),
+    (Commands.KICK, 'Выгнать игрока'),
+    (Commands.KILL, 'Завершить игру'),
+    (Commands.HELP, 'Помощь по боту'),
     (Commands.STATS, 'Ваша статистика'),
-    (Commands.OFF_STATS, 'Вимкнути статистику'),
-    (Commands.ON_STATS, 'Увімкнути статистику')
+    (Commands.OFF_STATS, 'Выключить статистику'),
+    (Commands.ON_STATS, 'Включить статистику')
 ]

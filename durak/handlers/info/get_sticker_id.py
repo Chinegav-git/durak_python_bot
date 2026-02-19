@@ -1,25 +1,27 @@
+from aiogram import Router, types, F
+from durak.filters import IsAdminFilter
+from durak.db.models import ChatSetting
 
-from aiogram import types
-from loader import dp
-from durak.db.models.chat_settings import ChatSetting
+router = Router()
 
-@dp.message_handler(content_types=types.ContentType.STICKER, chat_type=['group', 'supergroup'])
+# Цей обробник спрацює на будь-який стікер у групових чатах,
+# якщо користувач є глобальним адміністратором бота.
+@router.message(
+    F.sticker,
+    F.chat.type.in_({'group', 'supergroup'}),
+    IsAdminFilter(is_admin=True)  # Перевіряємо, чи є користувач адміном бота
+)
 async def get_sticker_id(message: types.Message):
     """
-    Отвечает на сообщение со стикером, отправляя его file_id, 
-    если в настройках чата включена соответствующая опция.
-    Только для администраторов.
+    Відповідає на стікер, надсилаючи його file_id,
+    якщо в налаштуваннях чату увімкнена відповідна опція.
+    Тільки для глобальних адміністраторів бота.
     """
     settings, _ = await ChatSetting.get_or_create(id=message.chat.id)
-    
-    # 1. Проверяем, включена ли функция в настройках чата
+
+    # Перевіряємо, чи увімкнена функція в налаштуваннях чату
     if not settings.sticker_id_helper:
-        return  # Если выключено, просто ничего не делаем
+        return  # Якщо вимкнено, нічого не робимо
 
-    # 2. Проверяем, является ли отправитель админом
-    user = await message.chat.get_member(message.from_user.id)
-    if not user.is_chat_admin():
-        return # Если не админ, тоже ничего не делаем
-
-    # 3. Если все проверки пройдены, отправляем ID стикера
+    # Якщо всі перевірки пройдено, відповідаємо ID стікера
     await message.reply(f"Sticker ID:\n`{message.sticker.file_id}`", parse_mode="Markdown")

@@ -1,57 +1,77 @@
-from aiogram import types
-from aiogram.dispatcher.filters import Command
-from loader import bot, dp, gm, Commands
-from durak.objects import *
-import durak.logic.actions as a
-from durak.logic.utils import (
-    user_is_creator_or_admin
-)
+from aiogram import F, Router, Bot, types
+from aiogram.filters import Command
+from aiogram.enums import ChatType
+
+from durak.filters.is_admin import IsAdminFilter
+from durak.logic import actions
+from durak.logic.game_manager import GameManager
 from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
-@dp.message_handler(Command(Commands.KICK), chat_type=['group', 'supergroup'])
-async def kick_handler(message: types.Message):
-    """ Kick a player from a game """
-    if not message.reply_to_message:
-        await message.reply("Ця команда має бути відповіддю на повідомлення гравця, якого ви хочете виключити.")
-        return
-    
-    kicker_user_id = message.from_user.id
+router = Router()
+gm = GameManager()
+
+@router.message(
+    Command("kick"),
+    F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}),
+    F.reply_to_message
+)
+async def kick_in_game_handler(message: types.Message):
+    """
+    Handles the /kick command during an active game.
+    Requires a reply to the message of the user to be kicked.
+    Can be used by the game creator or a chat admin.
+    """
+    kicker_user = message.from_user
     kicked_user = message.reply_to_message.from_user
     chat = message.chat
 
-    try:
-        game = await gm.get_game_from_chat(chat)
-    except NoGameInChatError:
-        await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
+    if kicked_user.is_bot:
+        await message.reply("Ви не можете виключити бота.")
         return
 
-    # Check if the user to be kicked is actually in the game
+    try:
+        game = await gm.get_game_from_chat(chat.id)
+    except NoGameInChatError:
+        await message.answer("🚫 У цьому чаті немає гри!")
+        return
+
     kicked_player = game.player_for_id(kicked_user.id)
     if not kicked_player:
-        await message.reply('🚫 Цей користувач не бере участі в грі.')
+        await message.reply("🚫 Цей користувач не бере участі в грі.")
+        return
+        
+    is_admin = await IsAdminFilter()(message)
+    if not (kicker_user.id == game.creator_id or is_admin):
+        await message.reply(
+            "🚫 Ви не можете виключати гравців. "
+            "Це може зробити тільки творець гри або адміністратор чату."
+        )
         return
 
-    # Check permissions
-    # Only the game creator or a chat admin can kick players
-    if not await user_is_creator_or_admin(kicker_user_id, game):
-        await message.reply('🚫 Ви не можете виключати гравців. Це може зробити тільки творець гри або адміністратор чату.')
-        return
-
-    # Prevent kicking the creator
     if kicked_player.id == game.creator_id:
-        await message.reply('🚫 Неможливо виключити творця гри.')
+        await message.reply("🚫 Неможливо виключити творця гри.")
         return
-    
+
     kicked_mention = kicked_user.get_mention(as_html=True)
-    kicker_mention = message.from_user.get_mention(as_html=True)
+    kicker_mention = kicker_user.get_mention(as_html=True)
 
     try:
-        await a.do_leave_player(game, kicked_player)
-    except NotEnoughPlayersError:
-        await gm.end_game(chat)
-        await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}.\n🎮 Гра завершена, оскільки не залишилося гравців!')
-    else:
+        await actions.do_leave_player(game, kicked_player)
+        
         if game.started:
-            await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}.\n🎯 Хід робить гравець {game.current_player.mention}')
+            await message.answer(
+                f"👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}."
+            )
         else:
-            await message.answer(f'👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention} з лоббі!')
+            await message.answer(
+                f"👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention} з лоббі!"
+            )
+
+    except NotEnoughPlayersError:
+        await gm.end_game(game)
+        await message.answer(
+            f"👋 {kicked_mention} був(ла) виключений(а) гравцем {kicker_mention}.\n"
+            "🎮 Гра завершена, оскільки гравців більше немає!"
+        )
+    except Exception as e:
+        await message.reply(f"Сталася помилка при виключенні гравця: {e}")

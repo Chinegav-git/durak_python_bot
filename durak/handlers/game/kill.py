@@ -1,32 +1,43 @@
+from aiogram import F, Router, types
+from aiogram.filters import Command
+from aiogram.enums import ChatType
 
-from aiogram import types
-from aiogram.dispatcher.filters import Command
-from loader import bot, dp, gm, Commands
-from durak.objects import *
-from durak.logic.utils import (
-    user_is_creator_or_admin
+from durak.filters.is_admin import IsAdminFilter
+from durak.logic.game_manager import GameManager
+from durak.objects.errors import NoGameInChatError
+
+router = Router()
+gm = GameManager()
+
+@router.message(
+    Command("kill", "stopgame", "endgame"),
+    F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP})
 )
-
-
-@dp.message_handler(Command(Commands.KILL), chat_type=['group', 'supergroup'])
-async def start_handler(message: types.Message):
-    ''' Kill a game '''
-    user_id = message.from_user.id
+async def kill_game_handler(message: types.Message):
+    """
+    Handles commands to forcibly terminate a game.
+    Can be used by the game creator or a chat admin.
+    """
+    user = message.from_user
     chat = message.chat
 
     try:
-        game = await gm.get_game_from_chat(chat)
+        game = await gm.get_game_from_chat(chat.id)
     except NoGameInChatError:
-        await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
+        await message.answer("🚫 У цьому чаті немає гри!")
         return
-    
-    mention = message.from_user.get_mention(as_html=True)
 
-    if (await user_is_creator_or_admin(user_id, game)):
-        # game end
-        await gm.end_game(chat)
-        await message.answer(f'🛑 {mention} завершив(ла) гру!')
+    # Permission check: must be creator or chat admin
+    is_admin = await IsAdminFilter()(message)
+    if not (user.id == game.creator_id or is_admin):
+        await message.answer(
+            "🚫 Ви не можете завершити гру! "
+            "Це може зробити лише творець гри або адміністратор чату."
+        )
         return
-    else:
-        await message.answer('🚫 Ви не можете завершити гру!')
-        return
+
+    # End the game
+    await gm.end_game(game)
+
+    mention = user.get_mention(as_html=True)
+    await message.answer(f"🛑 {mention} примусово завершив(ла) гру!")

@@ -1,9 +1,12 @@
+from aiogram import Router, types
+from aiogram.filters import Command
 
-from aiogram import types
-from aiogram.dispatcher.filters import Command
-from loader import dp, Commands
+# It's better to get commands from a single source if they are used across modules
+from config import Commands
 
-@dp.message_handler(Command([Commands.STATS, Commands.OFF_STATS, Commands.ON_STATS]))
+router = Router()
+
+@router.message(Command(Commands.STATS, Commands.OFF_STATS, Commands.ON_STATS))
 async def stats_redirect_handler(message: types.Message):
     """
     Informs user about the new settings menu.

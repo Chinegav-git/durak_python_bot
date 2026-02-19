@@ -1,11 +1,13 @@
-
-from aiogram import types
-from aiogram.dispatcher.filters import Command
+from aiogram import Router, types
+from aiogram.filters import Command
 from textwrap import dedent
-from loader import bot, dp, Commands
 
+# It's better to get commands from a single source if they are used across modules
+from config import Commands
 
-@dp.message_handler(Command([Commands.HELP, Commands.START_BOT]))
+router = Router()
+
+@router.message(Command(Commands.HELP, Commands.START_BOT))
 async def help_handler(message: types.Message):
     help_text = dedent(f"""<b>👋 Привіт! Я бот для гри в «Дурня».</b>
 

@@ -1,34 +1,57 @@
-from aiogram import types
-from aiogram.dispatcher.filters import Command
-from loader import dp, gm, Commands
-import durak.logic.actions as a
+from aiogram import F, Router, types
+from aiogram.filters import Command
+from aiogram.enums import ChatType
+
+from durak.logic import actions
+from durak.logic.game_manager import GameManager
 from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
-@dp.message_handler(Command(Commands.LEAVE), chat_type=['group', 'supergroup'])
-async def leave_handler(message: types.Message):
-    """ Leave a game """
+router = Router()
+gm = GameManager()
+
+@router.message(
+    Command("leave"),
+    F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP})
+)
+async def leave_game_handler(message: types.Message):
+    """
+    Handles a player leaving a game or lobby in the current chat.
+    """
     user = message.from_user
     chat = message.chat
 
     try:
-        game = await gm.get_game_from_chat(chat)
+        game = await gm.get_game_from_chat(chat.id)
     except NoGameInChatError:
-        await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
+        await message.answer(
+            "🚫 У цьому чаті немає гри.\n"
+            "🎮 Ви можете створити її за допомогою /new"
+        )
         return
 
     player = game.player_for_id(user.id)
-
-    if player is None:
-        await message.answer('🚫 Ви не в цій грі!')
+    if not player:
+        await message.answer("🚫 Ви не берете участь у грі в цьому чаті.")
         return
 
+    mention = user.get_mention(as_html=True)
+
     try:
-        await a.do_leave_player(game, player)
-    except NotEnoughPlayersError:
-        await gm.end_game(chat)
-        await message.answer('🎮 Гра завершена, оскільки гравців не залишилося!')
-    else:
+        await actions.do_leave_player(game, player)
+
         if game.started:
-            await message.answer(f'👍 Добре, хід робить гравець {game.current_player.mention}')
+            # The game state (current_player) is updated within do_leave_player
+            await message.answer(f"👋 {mention} покинув(ла) гру.")
         else:
-            await message.answer(f'👋 ({user.get_mention(as_html=True)}) - Покинув(ла) лобі!')
+            # Player left the lobby
+            await message.answer(f"👋 {mention} покинув(ла) лобі.")
+
+    except NotEnoughPlayersError:
+        # This happens if the last player leaves
+        await gm.end_game(game)
+        await message.answer(
+            f"👋 {mention} був останнім гравцем і покинув(ла) гру.\n"
+            "🎮 Гра завершена!"
+        )
+    except Exception as e:
+        await message.reply(f"Під час виходу з гри сталася помилка: {e}")

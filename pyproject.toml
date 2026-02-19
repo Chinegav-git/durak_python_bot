@@ -1,7 +1,4 @@
-[project]
-name = "myapp"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.11"
-dependencies = []
+[tool.aerich]
+tortoise_orm = "durak.db.tortoise_config.TORTOISE_ORM_CONFIG"
+location = "./migrations"
+src_folder = "."

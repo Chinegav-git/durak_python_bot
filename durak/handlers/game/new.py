@@ -1,12 +1,19 @@
-from aiogram import types
-from aiogram.dispatcher.filters import Command
-from loader import dp, gm, Commands
-from durak.objects import GameAlreadyInChatError, AlreadyJoinedInGlobalError
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram import types, F, Router
+from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-@dp.message_handler(Command(Commands.NEW), chat_type=['group', 'supergroup'])
-async def new_handler(message: types.Message):
-    """ Creating new game """
+from durak.logic.game_manager import GameManager
+from durak.objects import GameAlreadyInChatError, AlreadyJoinedInGlobalError
+from durak.handlers.game import GameCallback # Import our new CallbackData
+
+router = Router()
+gm = GameManager() # Assuming GameManager is our main logic controller
+
+@router.message(Command("new"), F.chat.type.in_({'group', 'supergroup'}))
+async def new_game_handler(message: types.Message):
+    """
+    Handles the /new command to create a new game.
+    """
     user = message.from_user
     chat = message.chat
 
@@ -20,14 +27,21 @@ async def new_handler(message: types.Message):
         await message.answer('🚫 Ви вже перебуваєте в іншій грі.')
         return
 
-    join_button = InlineKeyboardButton(text='👋 Приєднатися', callback_data=f'join_game_{game.id}')
-    start_button = InlineKeyboardButton(text='🚀 Почати гру', callback_data=f'start_game_{game.id}')
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[join_button], [start_button]])
+    # Build the keyboard with the new CallbackData
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text='👋 Приєднатися', 
+        callback_data=GameCallback(action="join", game_id=game.id)
+    )
+    builder.button(
+        text='🚀 Почати гру', 
+        callback_data=GameCallback(action="start", game_id=game.id)
+    )
+    builder.adjust(1)
     
     await message.answer(
         f'🎮 Гру створено!\n'
         f'👤 Засновник: {user.get_mention(as_html=True)}\n\n'
         f'Використовуйте кнопки нижче для керування грою:',
-        reply_markup=keyboard
+        reply_markup=builder.as_markup()
     )

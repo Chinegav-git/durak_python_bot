@@ -12,9 +12,9 @@ from ..objects.errors import *
 
 
 class GameManager:
-    def __init__(self, redis: Redis) -> None:
+    def __init__(self, bot: Bot, redis: Redis) -> None:
+        self.bot: Bot = bot
         self.redis: Redis = redis
-        self.bot: Bot = None
 
     def _game_key(self, chat_id: int) -> str:
         return f"game:{chat_id}"
@@ -32,9 +32,6 @@ class GameManager:
         key = self._game_key(game.id)
         serialized_game = await self._serialize_game(game)
         await self.redis.set(key, serialized_game)
-
-    def set_bot(self, bot: Bot):
-        self.bot = bot
 
     async def _new_game_db_session(self, chat_id: int, user_id: int):
         chat_setting, _ = await ChatSetting.get_or_create(id=chat_id)

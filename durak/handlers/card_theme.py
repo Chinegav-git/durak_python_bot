@@ -1,10 +1,12 @@
 import os
-from aiogram import types
-from aiogram.dispatcher.filters import Command
+from aiogram import Router, types, F
+from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from durak.db.models.chat_settings import ChatSetting
-from loader import dp
-from durak.handlers.settings import settings_cd
+from durak.db.models import ChatSetting
+from durak.handlers.settings import SettingsCallback
+
+router = Router()
 
 def get_available_themes():
     """Returns a sorted list of available card themes."""
@@ -15,33 +17,34 @@ def get_available_themes():
         if f.endswith('.py') and not f.startswith('__')
     ])
 
-async def get_card_theme_keyboard(chat_id):
+async def get_card_theme_keyboard(chat_id: int):
     """
     Generates the keyboard for card theme settings.
     Marks the current theme.
     """
     cs, _ = await ChatSetting.get_or_create(id=chat_id)
     current_theme = cs.card_theme
+    builder = InlineKeyboardBuilder()
 
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    buttons = []
-
+    # Add theme buttons
     for theme_id in get_available_themes():
-        text = f"» {theme_id.capitalize()} «" if current_theme == theme_id else theme_id.capitalize()
-        buttons.append(types.InlineKeyboardButton(
+        text = f'''» {theme_id.capitalize()} «''' if current_theme == theme_id else theme_id.capitalize()
+        builder.button(
             text=text,
-            callback_data=settings_cd.new(level="card_theme_select", value=theme_id)
-        ))
-    markup.add(*buttons)
+            callback_data=SettingsCallback(level="card_theme_select", value=theme_id)
+        )
+    # Arrange theme buttons in 2 columns
+    builder.adjust(2)
 
-    markup.add(types.InlineKeyboardButton(
+    # Add the 'Back' button on a new, separate row
+    builder.row(types.InlineKeyboardButton(
         text="⬅️ Назад",
-        callback_data=settings_cd.new(level="main_menu", value="back")
+        callback_data=SettingsCallback(level="main_menu", value="back").pack()
     ))
-    return markup
+    return builder.as_markup()
 
 
-@dp.message_handler(Command("cardtheme"))
+@router.message(Command("cardtheme"))
 async def set_card_theme(message: types.Message):
     """
     Forwards user to the settings menu
@@ -56,7 +59,7 @@ async def set_card_theme(message: types.Message):
     )
 
 
-@dp.callback_query_handler(settings_cd.filter(level="card_theme"))
+@router.callback_query(SettingsCallback.filter(F.level == "card_theme"))
 async def show_card_theme_settings(call: types.CallbackQuery):
     """
     Shows the card theme selection menu.
@@ -68,12 +71,12 @@ async def show_card_theme_settings(call: types.CallbackQuery):
     await call.answer()
 
 
-@dp.callback_query_handler(settings_cd.filter(level="card_theme_select"))
-async def set_card_theme_callback(call: types.CallbackQuery, callback_data: dict):
+@router.callback_query(SettingsCallback.filter(F.level == "card_theme_select"))
+async def set_card_theme_callback(call: types.CallbackQuery, callback_data: SettingsCallback):
     """
     Sets the chosen card theme from a callback.
     """
-    new_theme = callback_data.get("value")
+    new_theme = callback_data.value
     chat_id = call.message.chat.id
 
     chat_setting, _ = await ChatSetting.get_or_create(id=chat_id)
