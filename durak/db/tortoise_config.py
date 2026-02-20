@@ -22,8 +22,8 @@ async def init_db():
     Initializes the Tortoise ORM connection.
     """
     await Tortoise.init(config=TORTOISE_ORM_CONFIG)
-    if Config.DATABASE_URL.startswith("sqlite"):
-        await Tortoise.generate_schemas()
+    # if Config.DATABASE_URL.startswith("sqlite"):
+    #     await Tortoise.generate_schemas() # Отключено, т.к. используется Aerich для миграций
 
 async def close_db_connection():
     """

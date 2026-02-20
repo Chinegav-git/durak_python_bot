@@ -1,15 +1,22 @@
 from aiogram import Router
 
-# Import routers from submodules
-from .info import help, get_sticker_id
-from . import settings
+# Импортируем агрегированные роутеры из под-пакетов
+from .info import router as info_router
 from .game import router as game_router
+from .settings import router as settings_router
+from .stats import router as stats_router
+from .card_theme import router as card_theme_router
+from .game_mode import router as game_mode_router
 
-# Create a master router for the 'handlers' module
-router = Router()
+# Создаем главный роутер для всех обработчиков
+main_router = Router()
 
-# Include submodule routers
-router.include_router(help.router)
-router.include_router(get_sticker_id.router)
-router.include_router(settings.router)
-router.include_router(game_router)
+# Включаем в него роутеры всех разделов
+main_router.include_routers(
+    info_router,
+    game_router,
+    settings_router,
+    stats_router,
+    card_theme_router,
+    game_mode_router
+)

@@ -1,4 +1,4 @@
 [tool.aerich]
-tortoise_orm = "durak.db.tortoise_config.TORTOISE_ORM_CONFIG"
+tortoise_config = "durak.db.TORTOISE_ORM_CONFIG"
 location = "./migrations"
 src_folder = "."

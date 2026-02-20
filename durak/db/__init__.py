@@ -1,0 +1,1 @@
+from .tortoise_config import TORTOISE_ORM_CONFIG
