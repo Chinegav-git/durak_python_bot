@@ -1,22 +1,27 @@
 from aiogram import Router
 
-# Импортируем агрегированные роутеры из под-пакетов
-from .info import router as info_router
-from .game import router as game_router
-from .settings import router as settings_router
-from .stats import router as stats_router
-from .card_theme import router as card_theme_router
-from .game_mode import router as game_mode_router
+def setup() -> Router:
+    from . import (
+        card_theme,
+        game_mode,
+        settings,
+    )
+    from .game import setup as setup_game
+    from .info import setup as setup_info
 
-# Создаем главный роутер для всех обработчиков
-main_router = Router()
+    router = Router()
 
-# Включаем в него роутеры всех разделов
-main_router.include_routers(
-    info_router,
-    game_router,
-    settings_router,
-    stats_router,
-    card_theme_router,
-    game_mode_router
-)
+    game_router = setup_game()
+    info_router = setup_info()
+
+    router.include_router(game_router)
+    router.include_router(info_router)
+
+    for module in (
+        card_theme,
+        game_mode,
+        settings,
+    ):
+        router.include_router(module.router)
+
+    return router

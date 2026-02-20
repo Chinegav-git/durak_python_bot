@@ -1,16 +1,18 @@
 from aiogram import Router
 
-# Import routers from submodules
-from . import help
-from . import get_sticker_id
-from . import stats
+def setup() -> Router:
+    from . import (
+        get_sticker_id,
+        help,
+        stats,
+    )
 
-# Create a main router for the 'info' section
-router = Router()
+    router = Router()
+    for module in (
+        get_sticker_id,
+        help,
+        stats,
+    ):
+        router.include_router(module.router)
 
-# Include sub-routers
-router.include_routers(
-    help.router,
-    get_sticker_id.router,
-    stats.router
-)
+    return router
