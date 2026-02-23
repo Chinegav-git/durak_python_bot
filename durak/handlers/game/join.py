@@ -1,79 +1,158 @@
-from aiogram import types, F, Router
+# -*- coding: utf-8 -*-
+"""
+Модуль для обработки присоединения игроков к игре.
+Отвечает за команду /join и callback-кнопку "Присоединиться".
+
+Module for handling players joining a game.
+Responsible for the /join command and the "Join" callback button.
+"""
+
+from contextlib import suppress
+
+from aiogram import F, Router, types
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from contextlib import suppress
-from aiogram.exceptions import TelegramBadRequest
 
+# ИСПРАВЛЕНО: Импорт констант команд и конфигурации.
+# FIXED: Import command and configuration constants.
+from config import Commands, Config
 from durak.logic.game_manager import GameManager
-from durak.objects import *
-from durak.handlers.game import GameCallback
-from config import Config
+# ИСПРАВЛЕНО: Явный импорт исключений вместо wildcard.
+# FIXED: Explicit exception imports instead of wildcard.
+from durak.objects import (
+    AlreadyJoinedError,
+    AlreadyJoinedInGlobalError,
+    GameStartedError,
+    LimitPlayersInGameError,
+    LobbyClosedError,
+    NoGameInChatError,
+)
+
+# ИСПРАВЛЕНО: Корректный путь импорта GameCallback.
+# FIXED: Correct import path for GameCallback.
+from .game_callback import GameCallback
 
 router = Router()
 gm = GameManager()
 
-async def process_join(chat: types.Chat, user: types.User, game_id_from_callback: int = None):
-    """A generic function to handle joining a game."""
+
+async def process_join(chat: types.Chat, user: types.User, game_id_from_callback: str = None):
+    """
+    Универсальная функция для обработки логики присоединения к игре.
+    Вызывается как из обработчика команды, так и из обработчика callback'а.
+
+    - Проверяет наличие игры и соответствие ID.
+    - Обрабатывает все возможные ошибки присоединения (игра началась, лимит игроков и т.д.).
+    - В случае успеха возвращает объект игры, в случае ошибки - строку с текстом.
+    
+    Universal function for handling the logic of joining a game.
+    Called from both the command handler and the callback handler.
+
+    - Checks for the existence of a game and ID matching.
+    - Handles all possible join errors (game started, player limit, etc.).
+    - On success, returns the game object; on failure, returns a string with text.
+    """
     try:
         game = await gm.get_game_from_chat(chat)
-        if game_id_from_callback and game.id != game_id_from_callback:
-            return "Ця кнопка застаріла."
+        # Сверяем ID игры из callback'а с ID игры в чате, чтобы убедиться, что кнопка актуальна
+        if game_id_from_callback and game.id != int(game_id_from_callback):
+            # ИСПРАВЛЕНО: Текст переведен на русский.
+            return "Эта кнопка от другой игры, она больше не актуальна."
     except NoGameInChatError:
-        return f'🚫 У цьому чаті немає гри! Створіть її за допомогою - /new'
+        # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
+        return f'🚫 В этом чате нет игры! Создайте ее с помощью команды /{Commands.NEW}'
 
     try:
         await gm.join_in_game(game, user)
+    # ИСПРАВЛЕНО: Все сообщения об ошибках переведены на русский.
     except GameStartedError:
-        return '🎮 Гра вже запущена! 🚫 Ви не можете приєднатися!'
+        return '🚫 Игра уже началась, присоединиться нельзя!'
     except LobbyClosedError:
-        return '🚫 Лобі закрито!'
+        return '🚫 Лобби закрыто!'
     except LimitPlayersInGameError:
-        return f'🚫 Досягнуто ліміт у {Config.MAX_PLAYERS} гравців!'
+        return f'🚫 Достигнут лимит в {Config.MAX_PLAYERS} игроков!'
     except AlreadyJoinedInGlobalError:
-        return f'🚫 Схоже ви граєте в іншому чаті! Покинути цю гру - /gleave'
+        # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
+        return f'🚫 Вы уже играете в другом чате! Чтобы выйти, используйте /{Commands.GLEAVE}'
     except AlreadyJoinedError:
-        return '🎮 Ви вже в грі!'
+        return '🚫 Вы уже в игре!'
     
-    return game # Return game object on success
+    return game  # Возвращаем объект игры в случае успеха
 
-@router.message(Command("join"), F.chat.type.in_({'group', 'supergroup'}))
+
+@router.message(Command(Commands.JOIN), F.chat.type.in_({'group', 'supergroup'}))
 async def join_command_handler(message: types.Message):
-    """Handles the /join command."""
+    """
+    Обрабатывает команду /join.
+    
+    Handles the /join command.
+    """
     result = await process_join(message.chat, message.from_user)
     
     if isinstance(result, str):
         await message.answer(result)
     else:
-        await message.answer(f'👋 {message.from_user.get_mention(as_html=True)} приєднався до гри!')
+        # ИСПРАВЛЕНО: Текст переведен.
+        await message.answer(f'👋 {message.from_user.get_mention(as_html=True)} присоединился к игре!')
+        # TODO: После присоединения по команде, хорошо бы обновить сообщение с лобби.
+        # Это потребует хранения message_id лобби в объекте игры.
+
 
 @router.callback_query(GameCallback.filter(F.action == "join"))
 async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCallback):
-    """Handles the 'Join' button callback."""
+    """
+    Обрабатывает нажатие на inline-кнопку "Присоединиться".
+    Обновляет сообщение с лобби, добавляя нового игрока в список.
+
+    ИСПРАВЛЕНО:
+    - Добавлены полные docstring.
+    - Весь текст переведен на русский.
+    - Исправлен критический баг: добавлен .pack() для создания GameCallback.
+    - Исправлены импорты и использование констант команд.
+
+    Handles the "Join" inline button press.
+    Updates the lobby message, adding the new player to the list.
+
+    FIXED:
+    - Added full docstrings.
+    - All text translated into Russian.
+    - Fixed a critical bug: .pack() was added for GameCallback creation.
+    - Fixed imports and usage of command constants.
+    """
     result = await process_join(call.message.chat, call.from_user, callback_data.game_id)
     
     if isinstance(result, str):
         await call.answer(result, show_alert=True)
         return
 
-    # On successful join, update the message with the new player list
     game = result
-    await call.answer(f'👋 {call.from_user.first_name}, ви приєдналися до гри!', show_alert=False)
+    # ИСПРАВЛЕНО: Текст переведен.
+    await call.answer(f'👋 {call.from_user.first_name}, вы присоединились к игре!', show_alert=False)
     
     players_list = '\n'.join([
-        f'{i+1}. {player.get_mention(as_html=True)}'
+        f'{i + 1}. {player.get_mention(as_html=True)}'
         for i, player in enumerate(game.players)
     ])
     
+    # ИСПРАВЛЕНО: Добавлен .pack() и переведен текст кнопок.
     builder = InlineKeyboardBuilder()
-    builder.button(text='👋 Приєднатися', callback_data=GameCallback(action="join", game_id=game.id))
-    builder.button(text='🚀 Почати гру', callback_data=GameCallback(action="start", game_id=game.id))
+    builder.button(
+        text='👋 Присоединиться', 
+        callback_data=GameCallback(action="join", game_id=str(game.id)).pack()
+    )
+    builder.button(
+        text='🚀 Начать игру', 
+        callback_data=GameCallback(action="start", game_id=str(game.id)).pack()
+    )
     builder.adjust(1)
 
     with suppress(TelegramBadRequest):
+        # ИСПРАВЛЕНО: Текст сообщения лобби переведен на русский.
         await call.message.edit_text(
-            f'🎮 Гру створено!\n'
-            f'👤 Засновник: {game.creator.get_mention(as_html=True)}\n\n'
-            f'<b>Гравці:</b>\n{players_list}\n\n'
-            f'Використовуйте кнопки нижче для керування грою:',
+            f'🎮 Игра создана!\n'
+            f'👤 Создатель: {game.creator.get_mention(as_html=True)}\n\n'
+            f'<b>Игроки:</b>\n{players_list}\n\n'
+            f'Используйте кнопки ниже для управления игрой:',
             reply_markup=builder.as_markup()
         )

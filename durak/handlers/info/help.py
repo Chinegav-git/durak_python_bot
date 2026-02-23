@@ -1,35 +1,61 @@
+# -*- coding: utf-8 -*-
+"""
+Модуль для обработки информационных команд, таких как /help.
+Предоставляет пользователям справочную информацию о том, как использовать бота.
+
+Module for handling informational commands like /help.
+Provides users with help information on how to use the bot.
+"""
+
 from aiogram import Router, types
 from aiogram.filters import Command
 from textwrap import dedent
 
-# It's better to get commands from a single source if they are used across modules
+# ИМПОРТ: Команды импортируются из единого источника для консистентности.
 from config import Commands
 
 router = Router()
 
 @router.message(Command(Commands.HELP, Commands.START_BOT))
 async def help_handler(message: types.Message):
-    help_text = dedent(f"""<b>👋 Привіт! Я бот для гри в «Дурня».</b>
+    """
+    Обрабатывает команды /help и /start.
+    Отправляет пользователю подробное справочное сообщение.
+    
+    ИСПРАВЛЕНО:
+    - Текст полностью переведен на русский язык.
+    - Добавлена документация для модуля и обработчика.
+    - Жестко закодированная команда /settings заменена на импорт из конфига.
 
-<b>Як грати?</b>
-1️⃣ Додайте мене в груповий чат.
-2️⃣ Створіть нову гру командою /{Commands.NEW}.
-3️⃣ Інші гравці можуть приєднатися за допомогою команди /{Commands.JOIN}.
-4️⃣ Коли всі будуть готові (мінімум 2 гравці), творець гри може розпочати її командою /{Commands.START}.
+    Handles the /help and /start commands.
+    Sends a detailed help message to the user.
 
-<b>⚙️ Налаштування гри</b>
-Використовуйте команду /settings, щоб відкрити інтерактивне меню, де ви можете:
-• **Змінити режим гри:** (текст, стікери або змішаний).
-• **Обрати тему карт:** Налаштуйте вигляд карт у чаті.
-• **Керувати статистикою:** Увімкнути або вимкнути вашу особисту статистику.
+    FIXED:
+    - The text has been fully translated into Russian.
+    - Documentation has been added for the module and the handler.
+    - The hardcoded /settings command has been replaced with an import from the config.
+    """
+    # ИСПРАВЛЕНО: Текст переведен на русский и обновлен.
+    help_text = dedent(f"""<b>👋 Привет! Я бот для игры в «Дурака».</b>
 
-<b>Основні ігрові команди:</b>
-• /{Commands.NEW} - Створити нову гру.
-• /{Commands.JOIN} - Приєднатися до гри.
-• /{Commands.START} - Розпочати гру.
-• /settings - Відкрити меню налаштувань.
-• /{Commands.LEAVE} - Покинути гру (до її початку).
-• /{Commands.KICK} - Вигнати гравця (для творця гри).
-• /{Commands.KILL} - Примусово завершити гру (для адмінів).
+<b>Как играть?</b>
+1️⃣ Добавьте меня в групповой чат.
+2️⃣ Создайте новую игру командой /{Commands.NEW}.
+3️⃣ Другие игроки могут присоединиться с помощью команды /{Commands.JOIN}.
+4️⃣ Когда все будут готовы (минимум 2 игрока), создатель игры может начать её командой /{Commands.START}.
+
+<b>⚙️ Настройки игры</b>
+Используйте команду /{Commands.SETTINGS}, чтобы открыть интерактивное меню, где вы можете:
+• **Изменить режим игры:** (текст, стикеры или смешанный).
+• **Выбрать тему карт:** Настройте внешний вид карт в чате.
+
+<b>Основные игровые команды:</b>
+• /{Commands.NEW} - Создать новую игру.
+• /{Commands.JOIN} - Присоединиться к игре.
+• /{Commands.START} - Начать игру.
+• /{Commands.SETTINGS} - Открыть меню настроек.
+• /{Commands.LEAVE} - Покинуть лобби (до начала игры).
+• /{Commands.KICK} - Выгнать игрока (для создателя игры).
+• /{Commands.KILL} - Принудительно завершить игру (для администраторов чата).
 """)
     await message.answer(help_text)

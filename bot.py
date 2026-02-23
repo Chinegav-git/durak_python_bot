@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+Основной файл для запуска Telegram-бота.
+Отвечает за инициализацию, настройку и запуск всех компонентов бота.
+Main file for launching the Telegram bot.
+Responsible for initializing, configuring, and starting all bot components.
+"""
+
 import asyncio
 import logging
 import sys
@@ -11,16 +19,29 @@ from durak.handlers import router as main_router
 from durak.utils.set_bot_commands import set_default_commands
 
 async def on_startup(bot: Bot):
+    """
+    Выполняется при запуске бота. Устанавливает команды и инициализирует БД.
+    Executes when the bot starts. Sets commands and initializes the DB.
+    """
     await set_default_commands(bot)
     await init_db()
     logging.info("Bot started")
 
 async def on_shutdown():
+    """
+    Выполняется при остановке бота. Закрывает соединение с БД.
+    Executes when the bot stops. Closes the DB connection.
+    """
     await close_db_connection()
     logging.info("Bot stopped")
 
 async def main():
+    """
+    Основная асинхронная функция для настройки и запуска бота.
+    Main asynchronous function for configuring and launching the bot.
+    """
     # Явная проверка на наличие токена перед запуском
+    # Explicit check for the token before launching
     if not Config.BOT_TOKEN:
         logging.critical("КРИТИЧЕСКАЯ ОШИБКА: Переменная окружения BOT_TOKEN не найдена.")
         logging.critical("Пожалуйста, укажите токен вашего бота в .env файле и перезапустите приложение.")

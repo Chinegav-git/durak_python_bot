@@ -1,232 +1,123 @@
-from contextlib import suppress
+# -*- coding: utf-8 -*-
+"""
+Этот модуль является центральной точкой входа для меню настроек.
+Он отвечает за обработку команды /settings и отображение главного меню,
+откуда пользователь может перейти в другие разделы настроек.
 
-from aiogram import F, Bot, Router, types
-from aiogram.enums import ChatType
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command, StateFilter
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+This module is the central entry point for the settings menu.
+It handles the /settings command and displays the main menu,
+from where the user can navigate to other settings sections.
+"""
+
+from aiogram import F, Router, types
+from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from pony.orm import db_session
 
-from durak.db import ChatSetting, UserSetting
+from durak.db.models import ChatSetting
 from durak.filters.is_admin import IsAdminFilter
-from durak.handlers.game.start import get_lobby_message_text
-from durak.logic.game_manager import GameManager
-from durak.objects.errors import NoGameInChatError
+# ИСПРАВЛЕНО: Теперь используется SettingsCallback для навигации по меню.
+# FIXED: Now using SettingsCallback for menu navigation.
+from .settings_callback import SettingsCallback
 
 router = Router()
-gm = GameManager()
 
-# Values based on instructions.md
-CARD_THEMES = {
-    "classic": "Classic",
-    "gold_trumps": "Gold Trumps",
-}
+def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.InlineKeyboardMarkup:
+    """
+    Генерирует главное меню настроек в виде inline-клавиатуры.
+    
+    ИСПРАВЛЕНО: 
+    - Удалена вся логика, связанная с FSM и жестко закодированными значениями.
+    - Кнопки теперь используют SettingsCallback для навигации, что позволяет
+      делегировать обработку соответствующим модулям (game_mode.py, card_theme.py).
+    - Весь текст переведен на русский язык для единообразия.
 
-# Values based on instructions.md
-GAME_MODES = {
-    "text": "📝 Текст",
-    "text_and_sticker": "🃏 Текст + Стікери",
-    "sticker_and_button": "🕹️ Стікери + Кнопки",
-}
+    Generates the main settings menu as an inline keyboard.
 
+    FIXED:
+    - All logic related to FSM and hardcoded values has been removed.
+    - Buttons now use SettingsCallback for navigation, allowing delegation
+      of handling to the appropriate modules (game_mode.py, card_theme.py).
+    - All text has been translated into Russian for consistency.
+    """
+    builder = InlineKeyboardBuilder()
 
-class SettingsStates(StatesGroup):
-    main = State()
-    game_mode = State()
-    card_theme = State()
-    stats = State()
-
-
-def get_main_settings_keyboard(
-    cs: ChatSetting, us: UserSetting, is_admin: bool
-) -> types.InlineKeyboardMarkup:
-    builder = types.InlineKeyboardBuilder()
-
-    game_mode_text = GAME_MODES.get(cs.display_mode, "невідомо")
+    # Кнопка для перехода в меню выбора режима игры
     builder.button(
-        text=f"✍️ Режим гри ({game_mode_text})", callback_data="settings_game_mode"
+        text="✍️ Режим игры",
+        callback_data=SettingsCallback(level="gamemode").pack()
     )
 
-    card_theme_text = CARD_THEMES.get(cs.card_theme, "невідомо")
+    # Кнопка для перехода в меню выбора темы карт
     builder.button(
-        text=f"🎨 Тема карт ({card_theme_text})", callback_data="settings_card_theme"
+        text="🎨 Тема карт",
+        callback_data=SettingsCallback(level="card_theme").pack()
     )
 
-    stats_status = "✅" if us.stats else "❌"
-    builder.button(
-        text=f"{stats_status} Збір статистики", callback_data="settings_stats"
-    )
-
+    # Администраторская опция для включения/выключения помощника по ID стикеров
     if is_admin:
-        sticker_helper_status = "✅" if cs.sticker_id_helper else "❌"
+        with db_session:
+            cs, _ = ChatSetting.get_or_create(id=chat_id)
+            sticker_helper_status = "✅" if cs.sticker_id_helper else "❌"
+        
         builder.button(
-            text=f"👨‍💻 Sticker ID helper ({sticker_helper_status})",
-            callback_data="settings_toggle_sticker_helper",
+            text=f"👨‍💻 Помощник ID стикеров ({sticker_helper_status})",
+            callback_data=SettingsCallback(level="toggle_sticker_helper").pack(),
         )
+    
     builder.adjust(1)
     return builder.as_markup()
 
 
-@router.message(Command("settings"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
-async def settings_command_handler(message: types.Message, state: FSMContext):
-    await state.clear()
+@router.message(Command("settings"))
+async def settings_command_handler(message: types.Message):
+    """
+    Обработчик команды /settings.
+    Отображает главное меню настроек.
 
-    with db_session:
-        cs = ChatSetting.get(id=message.chat.id)
-        us = UserSetting.get(id=message.from_user.id)
-        if not cs:
-            cs = ChatSetting(id=message.chat.id)
-        if not us:
-            us = UserSetting(id=message.from_user.id)
-
-        is_admin = await IsAdminFilter()(message)
-
+    Handler for the /settings command.
+    Displays the main settings menu.
+    """
+    is_admin = await IsAdminFilter()(message)
     await message.answer(
-        "⚙️ **Налаштування**",
-        reply_markup=get_main_settings_keyboard(cs, us, is_admin),
-    )
-    await state.set_state(SettingsStates.main)
-
-
-@router.callback_query(F.data == "settings_back", StateFilter(SettingsStates))
-async def back_to_main_settings_handler(call: types.CallbackQuery, state: FSMContext):
-    with db_session:
-        cs = ChatSetting.get(id=call.message.chat.id)
-        us = UserSetting.get(id=call.from_user.id)
-        is_admin = await IsAdminFilter()(call)
-
-    with suppress(TelegramBadRequest):
-        await call.message.edit_text(
-            "⚙️ **Налаштування**",
-            reply_markup=get_main_settings_keyboard(cs, us, is_admin),
-        )
-    await state.set_state(SettingsStates.main)
-    await call.answer()
-
-
-# Game mode
-@router.callback_query(F.data == "settings_game_mode", SettingsStates.main)
-async def game_mode_settings_handler(call: types.CallbackQuery, state: FSMContext):
-    builder = types.InlineKeyboardBuilder()
-    for mode, text in GAME_MODES.items():
-        builder.button(text=text, callback_data=f"set_game_mode_{mode}")
-    builder.button(text="⬅️ Назад", callback_data="settings_back")
-    builder.adjust(1)
-
-    await call.message.edit_text("✍️ **Оберіть режим гри**", reply_markup=builder.as_markup())
-    await state.set_state(SettingsStates.game_mode)
-    await call.answer()
-
-
-@router.callback_query(F.data.startswith("set_game_mode_"), SettingsStates.game_mode)
-async def set_game_mode_handler(call: types.CallbackQuery, bot: Bot, state: FSMContext):
-    game_mode = call.data.removeprefix("set_game_mode_")
-    with db_session:
-        cs = ChatSetting.get(id=call.message.chat.id)
-        cs.display_mode = game_mode
-
-    try:
-        game = await gm.get_game_from_chat(call.message.chat.id)
-        if not game.started:
-            await bot.edit_message_text(
-                text=await get_lobby_message_text(game),
-                chat_id=game.id,
-                message_id=game.message_id,
-                reply_markup=game.lobby_keyboard(),
-            )
-    except NoGameInChatError:
-        pass
-
-    await call.answer(f"Режим гри змінено на «{GAME_MODES.get(game_mode)}»")
-    await back_to_main_settings_handler(call, state)
-
-
-# Card theme
-@router.callback_query(F.data == "settings_card_theme", SettingsStates.main)
-async def card_theme_settings_handler(call: types.CallbackQuery, state: FSMContext):
-    builder = types.InlineKeyboardBuilder()
-    for theme, text in CARD_THEMES.items():
-        builder.button(text=text, callback_data=f"set_card_theme_{theme}")
-    builder.button(text="⬅️ Назад", callback_data="settings_back")
-    builder.adjust(2, 1)
-
-    await call.message.edit_text("🎨 **Оберіть тему карт**", reply_markup=builder.as_markup())
-    await state.set_state(SettingsStates.card_theme)
-    await call.answer()
-
-
-@router.callback_query(F.data.startswith("set_card_theme_"), SettingsStates.card_theme)
-async def set_card_theme_handler(call: types.CallbackQuery, state: FSMContext):
-    card_theme = call.data.removeprefix("set_card_theme_")
-    with db_session:
-        cs = ChatSetting.get(id=call.message.chat.id)
-        cs.card_theme = card_theme
-
-    await call.answer(f"Тему карт змінено на «{CARD_THEMES.get(card_theme)}»")
-    await back_to_main_settings_handler(call, state)
-
-
-# Statistics
-def get_stats_keyboard(us: UserSetting) -> types.InlineKeyboardMarkup:
-    builder = types.InlineKeyboardBuilder()
-    stats_status = "✅" if us.stats else "❌"
-    builder.button(
-        text=f"{stats_status} Збір статистики", callback_data="settings_toggle_stats"
-    )
-    builder.button(text="⬅️ Назад", callback_data="settings_back")
-    return builder.as_markup()
-
-
-def get_stats_text(us: UserSetting) -> str:
-    win_percentage = (
-        round((us.first_places / us.games_played) * 100) if us.games_played else 0
-    )
-    return (
-        f"📊 **Ваша статистика**\n\n"
-        f"– Зіграно ігор: **{us.games_played}**\n"
-        f"– Перемоги: **{us.first_places}** ({win_percentage}%)\n"
-        f"– Зроблено ходів: **{us.cards_atack}**\n"
-        f"– Відбито карт: **{us.cards_beaten}**"
+        "⚙️ **Настройки**",
+        reply_markup=get_main_settings_keyboard(message.chat.id, is_admin),
     )
 
 
-@router.callback_query(F.data == "settings_stats", SettingsStates.main)
-async def stats_settings_handler(call: types.CallbackQuery, state: FSMContext):
-    with db_session:
-        us = UserSetting.get(id=call.from_user.id)
+@router.callback_query(SettingsCallback.filter(F.level == "main_menu"))
+async def back_to_main_settings_handler(call: types.CallbackQuery):
+    """
+    Обработчик для кнопки "Назад", возвращающей в главное меню настроек.
+
+    Handler for the "Back" button, which returns to the main settings menu.
+    """
+    is_admin = await IsAdminFilter()(call)
     await call.message.edit_text(
-        get_stats_text(us), reply_markup=get_stats_keyboard(us)
+        "⚙️ **Настройки**",
+        reply_markup=get_main_settings_keyboard(call.message.chat.id, is_admin),
     )
-    await state.set_state(SettingsStates.stats)
     await call.answer()
 
 
-@router.callback_query(F.data == "settings_toggle_stats", SettingsStates.stats)
-async def toggle_stats_handler(call: types.CallbackQuery):
-    with db_session:
-        us = UserSetting.get(id=call.from_user.id)
-        us.stats = not us.stats
-        new_status_text = "увімкнено" if us.stats else "вимкнено"
-        await call.answer(f"Збір статистики {new_status_text}")
-        with suppress(TelegramBadRequest):
-            await call.message.edit_text(
-                get_stats_text(us), reply_markup=get_stats_keyboard(us)
-            )
+@router.callback_query(SettingsCallback.filter(F.level == "toggle_sticker_helper"))
+@IsAdminFilter()
+async def toggle_sticker_helper_handler(call: types.CallbackQuery):
+    """
+    Обработчик для переключения помощника ID стикеров (только для администраторов).
 
-
-# Sticker ID helper
-@router.callback_query(
-    F.data == "settings_toggle_sticker_helper",
-    SettingsStates.main,
-    IsAdminFilter(),
-)
-async def toggle_sticker_helper_handler(call: types.CallbackQuery, state: FSMContext):
+    Handler for toggling the sticker ID helper (admins only).
+    """
+    chat_id = call.message.chat.id
     with db_session:
-        cs = ChatSetting.get(id=call.message.chat.id)
+        cs, _ = ChatSetting.get_or_create(id=chat_id)
         cs.sticker_id_helper = not cs.sticker_id_helper
+        new_status = "включен" if cs.sticker_id_helper else "выключен"
 
-    await call.answer(
-        f"Sticker ID helper {'увімкнено' if cs.sticker_id_helper else 'вимкнено'}"
+    await call.answer(f"Помощник ID стикеров {new_status}")
+
+    # Обновляем клавиатуру, чтобы отразить новое состояние
+    is_admin = await IsAdminFilter()(call)
+    await call.message.edit_reply_markup(
+        reply_markup=get_main_settings_keyboard(chat_id, is_admin)
     )
-    await back_to_main_settings_handler(call, state)

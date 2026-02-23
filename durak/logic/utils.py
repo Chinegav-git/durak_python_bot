@@ -1,28 +1,78 @@
+# -*- coding: utf-8 -*-
+"""
+Вспомогательные утилиты и функции-предикаты.
+
+Этот модуль предоставляет набор простых функций, которые используются для проверки
+прав доступа пользователя к определенным действиям в игре или в боте.
+Они инкапсулируют логику проверки, является ли пользователь создателем игры,
+администратором чата или глобальным администратором бота.
+
+-------------------------------------------------------------------------------------
+
+Auxiliary utilities and predicate functions.
+
+This module provides a set of simple functions used to check a user's access
+rights for specific actions in the game or the bot.
+They encapsulate the logic for checking if a user is the game creator,
+a chat administrator, or a global bot administrator.
+"""
+
 from aiogram import Bot
 from aiogram.types import Chat
-from ..objects import Game
-from config import Config
 
-def user_is_creator(user_id: int, game: Game):
-    """Checks if a user is the creator of the game."""
+from config import Config
+from ..objects import Game
+
+
+def user_is_creator(user_id: int, game: Game) -> bool:
+    """Проверяет, является ли пользователь создателем игры.
+    
+    Checks if a user is the creator of the game.
+    """
     return user_id == game.creator_id
 
-def user_is_bot_admin(user_id: int):
-    """Checks if a user is a global bot admin."""
+
+def user_is_bot_admin(user_id: int) -> bool:
+    """Проверяет, является ли пользователь глобальным администратором бота.
+    
+    Checks if a user is a global bot admin.
+    """
     return user_id in Config.ADMINS
 
+
 async def get_admin_ids(bot: Bot, chat_id: int) -> list[int]:
-    """Returns a list of admin IDs for a given chat."""
+    """Возвращает список ID администраторов для указанного чата.
+    
+    Returns a list of admin IDs for a given chat.
+    """
     chat_admins = await bot.get_chat_administrators(chat_id)
     return [admin.user.id for admin in chat_admins]
 
+
 async def user_is_chat_admin(bot: Bot, user_id: int, chat_id: int) -> bool:
-    """Checks if a user is an admin in a specific chat."""
+    """Проверяет, является ли пользователь администратором в конкретном чате.
+    
+    Checks if a user is an admin in a specific chat.
+    """
     return user_id in await get_admin_ids(bot, chat_id)
 
-async def user_is_creator_or_admin(bot: Bot, user_id: int, game: Game, chat: Chat) -> bool:
+
+async def user_is_creator_or_admin(bot: Bot, user_id: int, game: Game, chat_id: int) -> bool:
     """
-    Checks if a user is the game creator, a bot admin, or a chat admin.
+    Проверяет, является ли пользователь создателем игры или администратором чата.
+    
+    Checks if a user is the game creator or a chat administrator.
+    """
+    return user_is_creator(user_id, game) or await user_is_chat_admin(bot, user_id, chat_id)
+
+
+async def user_can_kick(bot: Bot, user_id: int, chat: Chat, game: Game) -> bool:
+    """
+    Проверяет, может ли пользователь исключить другого игрока.
+    Может создатель игры, администратор чата или администратор бота.
+    
+    Checks if a user can kick another player.
+    Allowed for the game creator, chat admin, or bot admin.
     """
     return (
         user_is_creator(user_id, game) or
@@ -30,6 +80,13 @@ async def user_is_creator_or_admin(bot: Bot, user_id: int, game: Game, chat: Cha
         await user_is_chat_admin(bot, user_id, chat.id)
     )
 
-async def user_can_change_gamemode(bot: Bot, user_id: int, chat_id: int) -> bool:
-    """Checks if a user can change the game mode (bot admin or chat admin)."""
+
+async def user_can_change_settings(bot: Bot, user_id: int, chat_id: int) -> bool:
+    """
+    Проверяет, может ли пользователь изменять настройки игры (тему, режим).
+    Может администратор чата или администратор бота.
+    
+    Checks if a user can change game settings (theme, mode).
+    Allowed for a chat admin or bot admin.
+    """
     return user_is_bot_admin(user_id) or await user_is_chat_admin(bot, user_id, chat_id)
