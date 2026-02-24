@@ -18,11 +18,11 @@ from tortoise import Tortoise
 
 # Загружаем переменные окружения для подключения к БД
 # Loading environment variables for DB connection
-DB_USER = os.environ.get("POSTGRES_USER", "postgres")
-DB_PASS = os.environ.get("POSTGRES_PASSWORD", "postgres")
-DB_HOST = os.environ.get("POSTGRES_HOST", "localhost")
+DB_USER = os.environ.get("POSTGRES_USER", "chinegav")
+DB_PASS = os.environ.get("POSTGRES_PASSWORD", "90874513067")
+DB_HOST = os.environ.get("POSTGRES_HOST", "127.0.0.1")
 DB_PORT = os.environ.get("POSTGRES_PORT", "5432")
-DB_NAME = os.environ.get("POSTGRES_DB", "postgres")
+DB_NAME = os.environ.get("POSTGRES_DB", "durak=db")
 
 # Формируем URL для подключения к PostgreSQL
 # Generating the connection URL for PostgreSQL
