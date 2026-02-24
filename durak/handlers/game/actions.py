@@ -21,7 +21,7 @@ from aiogram import F, Router, types
 from durak.logic import actions
 from durak.logic.game_manager import GameManager
 from durak.objects.card import Card
-from durak.objects.errors import GameNotFoundError, NoGameInChatError
+from durak.objects import GameNotFoundError, NoGameInChatError
 
 # ИСПРАВЛЕНО: Корректный импорт GameCallback
 # FIXED: Correct import for GameCallback

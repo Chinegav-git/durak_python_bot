@@ -4,7 +4,7 @@ from aiogram.enums import ChatType
 
 from durak.filters.is_admin import IsAdminFilter
 from durak.logic.game_manager import GameManager
-from durak.objects.errors import NoGameInChatError
+from durak.objects import NoGameInChatError
 
 router = Router()
 gm = GameManager()

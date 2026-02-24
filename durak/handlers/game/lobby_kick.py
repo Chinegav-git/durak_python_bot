@@ -3,7 +3,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 from durak.logic import actions
 from durak.logic.game_manager import GameManager
-from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
+from durak.objects import NoGameInChatError, NotEnoughPlayersError
 from durak.handlers.game import GameCallback
 from durak.handlers.game.start import get_lobby_message_text, get_lobby_keyboard
 

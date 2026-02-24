@@ -12,7 +12,7 @@ from aiogram.enums import ChatType
 
 from durak.logic import actions
 from durak.logic.game_manager import GameManager
-from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
+from durak.objects import NoGameInChatError, NotEnoughPlayersError
 
 router = Router()
 

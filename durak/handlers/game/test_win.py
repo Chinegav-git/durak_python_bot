@@ -1,6 +1,6 @@
 from aiogram import types
 from loader import dp, gm, Commands
-from durak.objects.errors import NoGameInChatError
+from durak.objects import NoGameInChatError
 
 
 @dp.message_handler(commands=[Commands.TEST_WIN], is_admin=True)
