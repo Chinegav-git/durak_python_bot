@@ -40,7 +40,7 @@ gm = GameManager()
 async def process_join(chat: types.Chat, user: types.User, game_id_from_callback: str = None):
     """
     Универсальная функция для обработки логики присоединения к игре.
-    Вызывается как из обработчика команды, так и из обработчика callback'а.
+    Вызывается как из обработчика команды, так и из обработчика callback\'а.
 
     - Проверяет наличие игры и соответствие ID.
     - Обрабатывает все возможные ошибки присоединения (игра началась, лимит игроков и т.д.).
@@ -55,28 +55,28 @@ async def process_join(chat: types.Chat, user: types.User, game_id_from_callback
     """
     try:
         game = await gm.get_game_from_chat(chat)
-        # Сверяем ID игры из callback'а с ID игры в чате, чтобы убедиться, что кнопка актуальна
+        # Сверяем ID игры из callback\'а с ID игры в чате, чтобы убедиться, что кнопка актуальна
         if game_id_from_callback and game.id != int(game_id_from_callback):
             # ИСПРАВЛЕНО: Текст переведен на русский.
             return "Эта кнопка от другой игры, она больше не актуальна."
     except NoGameInChatError:
         # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
-        return f'🚫 В этом чате нет игры! Создайте ее с помощью команды /{Commands.NEW}'
+        return f\'🚫 В этом чате нет игры! Создайте ее с помощью команды /{Commands.NEW}'
 
     try:
         await gm.join_in_game(game, user)
     # ИСПРАВЛЕНО: Все сообщения об ошибках переведены на русский.
     except GameStartedError:
-        return '🚫 Игра уже началась, присоединиться нельзя!'
+        return \'🚫 Игра уже началась, присоединиться нельзя!\'
     except LobbyClosedError:
-        return '🚫 Лобби закрыто!'
+        return \'🚫 Лобби закрыто!\'
     except LimitPlayersInGameError:
-        return f'🚫 Достигнут лимит в {Config.MAX_PLAYERS} игроков!'
+        return f\'🚫 Достигнут лимит в {Config.MAX_PLAYERS} игроков!\'
     except AlreadyJoinedInGlobalError:
         # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
-        return f'🚫 Вы уже играете в другом чате! Чтобы выйти, используйте /{Commands.GLEAVE}'
+        return f\'🚫 Вы уже играете в другом чате! Чтобы выйти, используйте /{Commands.GLEAVE}'
     except AlreadyJoinedError:
-        return '🚫 Вы уже в игре!'
+        return \'🚫 Вы уже в игре!\'
     
     return game  # Возвращаем объект игры в случае успеха
 
@@ -94,7 +94,7 @@ async def join_command_handler(message: types.Message):
         await message.answer(result)
     else:
         # ИСПРАВЛЕНО: Текст переведен.
-        await message.answer(f'👋 {message.from_user.get_mention(as_html=True)} присоединился к игре!')
+        await message.answer(f\'👋 {message.from_user.get_mention(as_html=True)} присоединился к игре!\')
         # TODO: После присоединения по команде, хорошо бы обновить сообщение с лобби.
         # Это потребует хранения message_id лобби в объекте игры.
 
@@ -110,6 +110,7 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     - Весь текст переведен на русский.
     - Исправлен критический баг: добавлен .pack() для создания GameCallback.
     - Исправлены импорты и использование констант команд.
+    - Восстановлена кнопка "Закрыть лобби" и корректное расположение кнопок.
 
     Handles the "Join" inline button press.
     Updates the lobby message, adding the new player to the list.
@@ -119,6 +120,7 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     - All text translated into Russian.
     - Fixed a critical bug: .pack() was added for GameCallback creation.
     - Fixed imports and usage of command constants.
+    - Restored the "Close Lobby" button and the correct button layout.
     """
     result = await process_join(call.message.chat, call.from_user, callback_data.game_id)
     
@@ -128,7 +130,7 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
 
     game = result
     # ИСПРАВЛЕНО: Текст переведен.
-    await call.answer(f'👋 {call.from_user.first_name}, вы присоединились к игре!', show_alert=False)
+    await call.answer(f\'👋 {call.from_user.first_name}, вы присоединились к игре!\', show_alert=False)
     
     players_list = '\n'.join([
         f'{i + 1}. {player.get_mention(as_html=True)}'
@@ -136,6 +138,7 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     ])
     
     # ИСПРАВЛЕНО: Добавлен .pack() и переведен текст кнопок.
+    # ИСПРАВЛЕНО: Восстановлена кнопка "Закрыть лобби" и расстановка adjust(1, 2)
     builder = InlineKeyboardBuilder()
     builder.button(
         text='👋 Присоединиться', 
@@ -145,14 +148,18 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
         text='🚀 Начать игру', 
         callback_data=GameCallback(action="start", game_id=str(game.id)).pack()
     )
-    builder.adjust(1)
+    builder.button(
+        text='🔒 Закрыть лобби',
+        callback_data=GameCallback(action="close", game_id=str(game.id)).pack()
+    )
+    builder.adjust(1, 2)
 
     with suppress(TelegramBadRequest):
         # ИСПРАВЛЕНО: Текст сообщения лобби переведен на русский.
         await call.message.edit_text(
-            f'🎮 Игра создана!\n'
-            f'👤 Создатель: {game.creator.get_mention(as_html=True)}\n\n'
-            f'<b>Игроки:</b>\n{players_list}\n\n'
-            f'Используйте кнопки ниже для управления игрой:',
+            f\'🎮 Игра создана!\n\'
+            f\'👤 Создатель: {game.creator.get_mention(as_html=True)}\n\n\'
+            f\'<b>Игроки:</b>\n{players_list}\n\n\'
+            f\'Используйте кнопки ниже для управления игрой:\',
             reply_markup=builder.as_markup()
         )
