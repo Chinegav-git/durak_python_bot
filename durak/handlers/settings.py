@@ -79,7 +79,7 @@ async def settings_command_handler(message: types.Message):
     Handler for the /settings command.
     Displays the main settings menu.
     """
-    is_admin = await IsAdminFilter()(message)
+    is_admin = await IsAdminFilter(is_admin=True)(message)
     await message.answer(
         "⚙️ **Настройки**",
         reply_markup=await get_main_settings_keyboard(message.chat.id, is_admin),
@@ -93,7 +93,7 @@ async def back_to_main_settings_handler(call: types.CallbackQuery):
 
     Handler for the "Back" button, which returns to the main settings menu.
     """
-    is_admin = await IsAdminFilter()(call)
+    is_admin = await IsAdminFilter(is_admin=True)(call)
     await call.message.edit_text(
         "⚙️ **Настройки**",
         reply_markup=await get_main_settings_keyboard(call.message.chat.id, is_admin),
@@ -101,8 +101,7 @@ async def back_to_main_settings_handler(call: types.CallbackQuery):
     await call.answer()
 
 
-@router.callback_query(SettingsCallback.filter(F.level == "toggle_sticker_helper"))
-@IsAdminFilter()
+@router.callback_query(SettingsCallback.filter(F.level == "toggle_sticker_helper"), IsAdminFilter(is_admin=True))
 async def toggle_sticker_helper_handler(call: types.CallbackQuery):
     """
     Обработчик для переключения помощника ID стикеров (только для администраторов).
@@ -121,7 +120,7 @@ async def toggle_sticker_helper_handler(call: types.CallbackQuery):
     await call.answer(f"Помощник ID стикеров {new_status}")
 
     # Обновляем клавиатуру, чтобы отразить новое состояние
-    is_admin = await IsAdminFilter()(call)
+    # Поскольку этот обработчик доступен только администраторам, мы можем безопасно передать True
     await call.message.edit_reply_markup(
-        reply_markup=await get_main_settings_keyboard(chat_id, is_admin)
+        reply_markup=await get_main_settings_keyboard(chat_id, True)
     )
