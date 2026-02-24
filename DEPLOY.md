@@ -97,8 +97,8 @@ apt install -y redis-server
     BOT_TOKEN=ВАШ_ТОКЕН_БОТА_ОТ_BOTFATHER
 
     # Настройки базы данных
-    DB_USER=durak_user
-    DB_PASSWORD=ваш_супер_надежный_пароль
+    DB_USER=chinegav
+    DB_PASSWORD=
     DB_HOST=localhost
     DB_PORT=5432
     DB_NAME=durak_db

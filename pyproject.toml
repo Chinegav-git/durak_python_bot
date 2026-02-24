@@ -1,14 +1,6 @@
 # Cекция для настройки инструмента миграций Aerich
 # Section for configuring the Aerich migration tool
 [tool.aerich]
-# Указывает путь к конфигурации Tortoise ORM
-# Specifies the path to the Tortoise ORM configuration
 tortoise_orm = "durak.db.tortoise_config.TORTOISE_ORM"
-
-# Определяет папку, в которой будут храниться файлы миграций
-# Defines the folder where migration files will be stored
 location = "./migrations"
-
-# Указывает корневую папку исходного кода для корректного обнаружения моделей
-# Specifies the root source code folder for correct model detection
 src_folder = "./."

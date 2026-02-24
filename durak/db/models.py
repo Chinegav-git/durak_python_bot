@@ -70,8 +70,6 @@ class Game(models.Model):
     # Current status of the game (e.g., 'lobby', 'playing', 'finished')
     status = fields.CharField(max_length=255)
 
-aerich migrate --name fix_models
-
 class UserSetting(models.Model):
     """
     Модель для хранения настроек и статистики пользователя.
