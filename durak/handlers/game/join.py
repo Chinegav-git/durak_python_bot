@@ -60,22 +60,22 @@ async def process_join(chat: types.Chat, user: types.User, gm: GameManager, game
             return "Эта кнопка от другой игры, она больше не актуальна."
     except NoGameInChatError:
         # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
-        return f\'🚫 В этом чате нет игры! Создайте ее с помощью команды /{Commands.NEW}\'
+        return f'🚫 В этом чате нет игры! Создайте ее с помощью команды /{Commands.NEW}'
 
     try:
         await gm.join_in_game(game, user)
     # ИСПРАВЛЕНО: Все сообщения об ошибках переведены на русский.
     except GameStartedError:
-        return \'🚫 Игра уже началась, присоединиться нельзя!\'
+        return '🚫 Игра уже началась, присоединиться нельзя!'
     except LobbyClosedError:
-        return \'🚫 Лобби закрыто!\'
+        return '🚫 Лобби закрыто!'
     except LimitPlayersInGameError:
-        return f\'🚫 Достигнут лимит в {Config.MAX_PLAYERS} игроков!\'
+        return f'🚫 Достигнут лимит в {Config.MAX_PLAYERS} игроков!'
     except AlreadyJoinedInGlobalError:
         # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
-        return f\'🚫 Вы уже играете в другом чате! Чтобы выйти, используйте /{Commands.GLEAVE}\'
+        return f'🚫 Вы уже играете в другом чате! Чтобы выйти, используйте /{Commands.GLEAVE}'
     except AlreadyJoinedError:
-        return \'🚫 Вы уже в игре!\'
+        return '🚫 Вы уже в игре!'
     
     return game  # Возвращаем объект игры в случае успеха
 
@@ -93,7 +93,7 @@ async def join_command_handler(message: types.Message, gm: GameManager):
         await message.answer(result)
     else:
         # ИСПРАВЛЕНО: Текст переведен.
-        await message.answer(f\'👋 {message.from_user.get_mention(as_html=True)} присоединился к игре!\')
+        await message.answer(f'👋 {message.from_user.get_mention(as_html=True)} присоединился к игре!')
         # TODO: После присоединения по команде, хорошо бы обновить сообщение с лобби.
         # Это потребует хранения message_id лобби в объекте игры.
 
@@ -129,7 +129,7 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
 
     game = result
     # ИСПРАВЛЕНО: Текст переведен.
-    await call.answer(f\'👋 {call.from_user.first_name}, вы присоединились к игре!\', show_alert=False)
+    await call.answer(f'👋 {call.from_user.first_name}, вы присоединились к игре!', show_alert=False)
     
     players_list = '\n'.join([
         f'{i + 1}. {player.get_mention(as_html=True)}'
@@ -156,9 +156,9 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     with suppress(TelegramBadRequest):
         # ИСПРАВЛЕНО: Текст сообщения лобби переведен на русский.
         await call.message.edit_text(
-            f\'🎮 Игра создана!\n\'
-            f\'👤 Создатель: {game.creator.get_mention(as_html=True)}\n\n\'
-            f\'<b>Игроки:</b>\n{players_list}\n\n\'
-            f\'Используйте кнопки ниже для управления игрой:\',
+            f'🎮 Игра создана!\n'
+            f'👤 Создатель: {game.creator.get_mention(as_html=True)}\n\n'
+            f'<b>Игроки:</b>\n{players_list}\n\n'
+            f'Используйте кнопки ниже для управления игрой:',
             reply_markup=builder.as_markup()
         )
