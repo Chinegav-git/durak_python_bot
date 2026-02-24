@@ -12,9 +12,8 @@ from where the user can navigate to other settings sections.
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from pony.orm import db_session
 
-from durak.db.models import ChatSetting
+from durak.db.models import Chat, ChatSetting
 from durak.filters.is_admin import IsAdminFilter
 # ИСПРАВЛЕНО: Теперь используется SettingsCallback для навигации по меню.
 # FIXED: Now using SettingsCallback for menu navigation.
@@ -22,7 +21,7 @@ from .settings_callback import SettingsCallback
 
 router = Router()
 
-def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.InlineKeyboardMarkup:
+async def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.InlineKeyboardMarkup:
     """
     Генерирует главное меню настроек в виде inline-клавиатуры.
     
@@ -31,6 +30,7 @@ def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.InlineKeyb
     - Кнопки теперь используют SettingsCallback для навигации, что позволяет
       делегировать обработку соответствующим модулям (game_mode.py, card_theme.py).
     - Весь текст переведен на русский язык для единообразия.
+    - Использование pony.orm заменено на асинхронные вызовы Tortoise ORM.
 
     Generates the main settings menu as an inline keyboard.
 
@@ -39,6 +39,7 @@ def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.InlineKeyb
     - Buttons now use SettingsCallback for navigation, allowing delegation
       of handling to the appropriate modules (game_mode.py, card_theme.py).
     - All text has been translated into Russian for consistency.
+    - The use of pony.orm has been replaced with asynchronous calls to Tortoise ORM.
     """
     builder = InlineKeyboardBuilder()
 
@@ -56,9 +57,9 @@ def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.InlineKeyb
 
     # Администраторская опция для включения/выключения помощника по ID стикеров
     if is_admin:
-        with db_session:
-            cs, _ = ChatSetting.get_or_create(id=chat_id)
-            sticker_helper_status = "✅" if cs.sticker_id_helper else "❌"
+        chat, _ = await Chat.get_or_create(id=chat_id)
+        cs, _ = await ChatSetting.get_or_create(chat=chat)
+        sticker_helper_status = "✅" if cs.sticker_id_helper else "❌"
         
         builder.button(
             text=f"👨‍💻 Помощник ID стикеров ({sticker_helper_status})",
@@ -81,7 +82,7 @@ async def settings_command_handler(message: types.Message):
     is_admin = await IsAdminFilter()(message)
     await message.answer(
         "⚙️ **Настройки**",
-        reply_markup=get_main_settings_keyboard(message.chat.id, is_admin),
+        reply_markup=await get_main_settings_keyboard(message.chat.id, is_admin),
     )
 
 
@@ -95,7 +96,7 @@ async def back_to_main_settings_handler(call: types.CallbackQuery):
     is_admin = await IsAdminFilter()(call)
     await call.message.edit_text(
         "⚙️ **Настройки**",
-        reply_markup=get_main_settings_keyboard(call.message.chat.id, is_admin),
+        reply_markup=await get_main_settings_keyboard(call.message.chat.id, is_admin),
     )
     await call.answer()
 
@@ -109,15 +110,18 @@ async def toggle_sticker_helper_handler(call: types.CallbackQuery):
     Handler for toggling the sticker ID helper (admins only).
     """
     chat_id = call.message.chat.id
-    with db_session:
-        cs, _ = ChatSetting.get_or_create(id=chat_id)
-        cs.sticker_id_helper = not cs.sticker_id_helper
-        new_status = "включен" if cs.sticker_id_helper else "выключен"
+    
+    chat, _ = await Chat.get_or_create(id=chat_id)
+    cs, _ = await ChatSetting.get_or_create(chat=chat)
+    cs.sticker_id_helper = not cs.sticker_id_helper
+    await cs.save()
+
+    new_status = "включен" if cs.sticker_id_helper else "выключен"
 
     await call.answer(f"Помощник ID стикеров {new_status}")
 
     # Обновляем клавиатуру, чтобы отразить новое состояние
     is_admin = await IsAdminFilter()(call)
     await call.message.edit_reply_markup(
-        reply_markup=get_main_settings_keyboard(chat_id, is_admin)
+        reply_markup=await get_main_settings_keyboard(chat_id, is_admin)
     )
