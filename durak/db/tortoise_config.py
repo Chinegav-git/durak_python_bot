@@ -1,13 +1,32 @@
 # -*- coding: utf-8 -*-
 """
 Файл конфигурации для Tortoise ORM.
-Определяет параметры подключения к базе данных и указывает расположение моделей.
+
+ИСПРАВЛЕНО: Конфигурация была явно изменена для принудительного использования PostgreSQL.
+Ранее система могла откатываться к SQLite, если переменные окружения были недоступны,
+что приводило к созданию миграций для неверной СУБД.
+
 Configuration file for Tortoise ORM.
-Defines database connection parameters and specifies the location of models.
+
+FIXED: The configuration has been explicitly changed to enforce the use of PostgreSQL.
+Previously, the system could fall back to SQLite if environment variables were not available,
+which led to creating migrations for the wrong СУБД.
 """
 
+import os
 from tortoise import Tortoise
-from config import Config
+
+# Загружаем переменные окружения для подключения к БД
+# Loading environment variables for DB connection
+DB_USER = os.environ.get("POSTGRES_USER", "postgres")
+DB_PASS = os.environ.get("POSTGRES_PASSWORD", "postgres")
+DB_HOST = os.environ.get("POSTGRES_HOST", "localhost")
+DB_PORT = os.environ.get("POSTGRES_PORT", "5432")
+DB_NAME = os.environ.get("POSTGRES_DB", "postgres")
+
+# Формируем URL для подключения к PostgreSQL
+# Generating the connection URL for PostgreSQL
+DATABASE_URL = f"postgres://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Словарь с конфигурацией Tortoise ORM
 # Dictionary with Tortoise ORM configuration
@@ -17,8 +36,8 @@ TORTOISE_ORM = {
     "connections": {
         # "default" - это имя подключения, которое будет использоваться по умолчанию.
         # "default" is the name of the connection that will be used by default.
-        "default": Config.DATABASE_URL # URL для подключения берется из объекта Config.
-                                        # The connection URL is taken from the Config object.
+        "default": DATABASE_URL # URL для подключения к PostgreSQL.
+                                # The connection URL for PostgreSQL.
     },
     # "apps" определяет, где Tortoise будет искать модели.
     # "apps" defines where Tortoise will look for models.
