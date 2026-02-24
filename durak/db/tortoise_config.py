@@ -22,7 +22,7 @@ DB_USER = os.environ.get("POSTGRES_USER", "chinegav")
 DB_PASS = os.environ.get("POSTGRES_PASSWORD", "90874513067")
 DB_HOST = os.environ.get("POSTGRES_HOST", "127.0.0.1")
 DB_PORT = os.environ.get("POSTGRES_PORT", "5432")
-DB_NAME = os.environ.get("POSTGRES_DB", "durak=db")
+DB_NAME = os.environ.get("POSTGRES_DB", "durak_db")
 
 # Формируем URL для подключения к PostgreSQL
 # Generating the connection URL for PostgreSQL
