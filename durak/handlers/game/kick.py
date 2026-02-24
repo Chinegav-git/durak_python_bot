@@ -56,7 +56,8 @@ async def kick_in_game_handler(message: types.Message, gm: GameManager):
     kicker_mention = kicker_user.get_mention(as_html=True)
 
     try:
-        await actions.do_leave_player(game, kicked_player)
+        # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию
+        await actions.do_leave_player(game, kicked_player, gm)
         
         if game.started:
             await message.answer(

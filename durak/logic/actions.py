@@ -32,13 +32,21 @@ import logging
 from contextlib import suppress
 
 from aiogram import Bot, types
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from loader import CHOISE, gm  # Глобальный GameManager
+# ИСПРАВЛЕНО (рефакторинг): Удален импорт `CHOISE` и `gm` из устаревшего модуля `loader`.
+# # Глобальный GameManager <-- Старый комментарий сохранен для истории.
+# Зависимость GameManager теперь внедряется через аргументы функций.
+# FIXED (refactoring): Removed `CHOISE` and `gm` import from the deprecated `loader` module.
+# # Global GameManager <-- Old comment saved for history.
+# The GameManager dependency is now injected via function arguments.
 from ..db.models import ChatSetting, UserSetting # ИСПРАВЛЕНО: Убран неиспользуемый UserSetting
+from ..handlers.game.game_callback import GameCallback
+from ..logic.game_manager import GameManager
 from ..objects import Card, Game, Player
 # ИСПРАВЛЕНО: `card as c` заменен на `theme as th` для получения стикеров
 from ..objects import theme as th
-from ..objects.exceptions import NoGameInChatError, NotAllowedMove
+from ..objects.errors import NoGameInChatError, NotAllowedMove
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +80,16 @@ async def send_turn_notification(game: Game):
     if not defender:
         return
 
+    # ИСПРАВЛЕНО (рефакторинг): Клавиатура-заглушка CHOISE заменена на динамическую
+    # с использованием InlineKeyboardBuilder и GameCallback для консистентности.
+    # FIXED (refactoring): The CHOISE placeholder keyboard has been replaced with a dynamic one
+    # using InlineKeyboardBuilder and GameCallback for consistency.
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🃏 Мои карты", callback_data=GameCallback(action="my_cards", game_id=str(game.id)).pack())
+    builder.button(text="✅ Пас", callback_data=GameCallback(action="pass", game_id=str(game.id)).pack())
+    builder.button(text="📥 Взять", callback_data=GameCallback(action="take", game_id=str(game.id)).pack())
+    builder.adjust(1, 2)
+
     text = (
         f'✅ <b>Переход хода</b>\n\n'
         f'⚔️ Атакует: {attacker.mention} (🃏{len(attacker.cards)})\n'
@@ -79,8 +97,7 @@ async def send_turn_notification(game: Game):
         f'🃏 Козырь: {game.deck.trump_ico}\n'
         f'🃏 В колоде: {len(game.deck.cards)} карт'
     )
-    reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
-    await bot.send_message(game.id, text, reply_markup=reply_markup)
+    await bot.send_message(game.id, text, reply_markup=builder.as_markup())
 
 
 async def send_no_more_attacks_notification(game: Game):
@@ -114,7 +131,7 @@ async def send_no_more_attacks_notification(game: Game):
 #
 # async def _update_win_stats(user_id: int): ...
 
-async def win(game: Game, player: Player):
+async def win(game: Game, player: Player, gm: GameManager):
     """
     Обрабатывает победу игрока. Отправляет сообщение и сохраняет победителя.
 
@@ -138,7 +155,7 @@ async def win(game: Game, player: Player):
     await gm.save_game(game)
 
 
-async def do_turn(game: Game, skip_def: bool = False):
+async def do_turn(game: Game, gm: GameManager, skip_def: bool = False):
     """
     Выполняет переход хода. Проверяет, не окончена ли игра или не вышел ли кто-то.
     Если игра окончена, отправляет итоговое сообщение. В противном случае - передает ход.
@@ -160,7 +177,7 @@ async def do_turn(game: Game, skip_def: bool = False):
         player_has_left = False
         for player in list(game.players):
             if not player.cards and not player.finished_game:
-                await win(game, player)
+                await win(game, player, gm)
                 player.finished_game = True
                 player_has_left = True
 
@@ -178,7 +195,7 @@ async def do_turn(game: Game, skip_def: bool = False):
         await send_turn_notification(game)
 
 
-async def do_leave_player(game: Game, player: Player, from_turn: bool = False):
+async def do_leave_player(game: Game, player: Player, gm: GameManager, from_turn: bool = False):
     """
     Обрабатывает выход игрока из игры.
     
@@ -191,10 +208,10 @@ async def do_leave_player(game: Game, player: Player, from_turn: bool = False):
 
     if not from_turn:
         was_defender = (game.opponent_player and player.id == game.opponent_player.id)
-        await do_turn(game, skip_def=was_defender)
+        await do_turn(game, gm, skip_def=was_defender)
 
 
-async def do_pass(game: Game, player: Player):
+async def do_pass(game: Game, player: Player, gm: GameManager):
     """
     Обрабатывает действие "Пас" от атакующего игрока.
     
@@ -213,10 +230,10 @@ async def do_pass(game: Game, player: Player):
 
     # Если все карты на поле побиты, и кто-то сказал "пас", ход завершается
     if game.all_beaten_cards:
-        await do_turn(game)
+        await do_turn(game, gm)
 
 
-async def do_draw(game: Game, player: Player):
+async def do_draw(game: Game, player: Player, gm: GameManager):
     """
     Обрабатывает действие "Взять" от защищающегося игрока.
     Игрок забирает все карты с поля, и ход остается у атакующих.
@@ -240,12 +257,18 @@ async def do_draw(game: Game, player: Player):
     
     taking_player = game.opponent_player
     game.take_all_field() # Ключевая логика - игрок берет карты
-    await do_turn(game, skip_def=True) # Переход хода без смены защитника
+    await do_turn(game, gm, skip_def=True) # Переход хода без смены защитника
 
     attacker = game.current_player
     defender = game.opponent_player
     
     # Уведомление о том, что игрок взял карты
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🃏 Мои карты", callback_data=GameCallback(action="my_cards", game_id=str(game.id)).pack())
+    builder.button(text="✅ Пас", callback_data=GameCallback(action="pass", game_id=str(game.id)).pack())
+    builder.button(text="📥 Взять", callback_data=GameCallback(action="take", game_id=str(game.id)).pack())
+    builder.adjust(1, 2)
+    
     text = (
         f'↪️ <b>Ход остается</b>\n\n'
         f'🫳 {taking_player.mention} берет карты.\n'
@@ -254,8 +277,7 @@ async def do_draw(game: Game, player: Player):
         f'🃏 Козырь: {game.deck.trump_ico}\n'
         f'🃏 В колоде: {len(game.deck.cards)} карт'
     )
-    reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
-    await bot.send_message(game.id, text, reply_markup=reply_markup)
+    await bot.send_message(game.id, text, reply_markup=builder.as_markup())
 
 
 async def _get_attack_settings(chat_id: int):
@@ -282,7 +304,7 @@ async def _update_attack_stats(user_id: int):
         await us.save()
 
 
-async def do_attack_card(game: Game, player: Player, card: Card):
+async def do_attack_card(game: Game, player: Player, card: Card, gm: GameManager):
     """
     Обрабатывает ход атакующей картой.
     
@@ -354,7 +376,7 @@ async def _update_defense_stats(user_id: int):
         us.cards_beaten += 1
         await us.save()
 
-async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: Card):
+async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: Card, gm: GameManager):
     """
     Обрабатывает ход защищающейся картой.
     
@@ -385,7 +407,7 @@ async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: 
 
     # Если все карты побиты и был пас (или авто-пас), завершаем ход
     if game.all_beaten_cards and (game.is_pass or should_autopass):
-        await do_turn(game)
+        await do_turn(game, gm)
     else:
         toss_more_markup = types.InlineKeyboardMarkup(inline_keyboard=[
             [types.InlineKeyboardButton(text='↪️ Подкинуть еще', switch_inline_query_current_chat='')]

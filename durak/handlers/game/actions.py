@@ -67,14 +67,16 @@ async def process_card_move_handler(message: types.Message, gm: GameManager):
             if not def_card:
                 return
 
-            await actions.do_defence_card(game, player, undefended_card, def_card)
+            # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию
+            await actions.do_defence_card(game, player, undefended_card, def_card, gm)
 
         elif player in (game.current_player, game.support_player):
             atk_card = Card.from_str(card_str)
             if not atk_card:
                 return
             
-            await actions.do_attack_card(game, player, atk_card)
+            # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию
+            await actions.do_attack_card(game, player, atk_card, gm)
 
     except GameNotFoundError:
         pass
@@ -104,7 +106,8 @@ async def take_cards_callback_handler(call: types.CallbackQuery, callback_data: 
             await call.answer("Только защищающийся игрок может взять карты.", show_alert=True)
             return
 
-        await actions.do_draw(game, player)
+        # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию
+        await actions.do_draw(game, player, gm)
         await call.answer("Вы взяли карты со стола.")
     
     except (NoGameInChatError, ValueError):
@@ -132,7 +135,8 @@ async def pass_turn_callback_handler(call: types.CallbackQuery, callback_data: G
             await call.answer("Сейчас не ваш ход, чтобы пасовать.", show_alert=True)
             return
         
-        await actions.do_pass(game, player)
+        # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию
+        await actions.do_pass(game, player, gm)
         await call.answer("Пас!")
             
     except (NoGameInChatError, ValueError):

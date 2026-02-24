@@ -37,7 +37,8 @@ async def leave_game_handler(message: types.Message, gm: GameManager):
     mention = user.get_mention(as_html=True)
 
     try:
-        await actions.do_leave_player(game, player)
+        # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию
+        await actions.do_leave_player(game, player, gm)
 
         if game.started:
             # The game state (current_player) is updated within do_leave_player
