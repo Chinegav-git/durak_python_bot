@@ -23,10 +23,10 @@ from .game_callback import GameCallback
 from config import Commands
 
 router = Router()
-gm = GameManager()
+
 
 @router.message(Command(Commands.NEW), F.chat.type.in_({'group', 'supergroup'}))
-async def new_game_handler(message: types.Message):
+async def new_game_handler(message: types.Message, gm: GameManager):
     """
     Обрабатывает команду /new для создания новой игры в групповом чате.
 

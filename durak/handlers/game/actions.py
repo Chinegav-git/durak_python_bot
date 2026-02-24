@@ -14,11 +14,12 @@ but preserving the original architecture for a future, correct refactoring.
 
 from aiogram import F, Router, types
 
-# ИСПРАВЛЕНО (стабилизация): Импортируем `gm` из `loader` для единообразия
-# FIXED (stabilization): Import `gm` from `loader` for consistency
-from loader import gm
-
+# ИСПРАВЛЕНО: Убран некорректный импорт из loader.py. GameManager теперь
+# будет получаться через инъекцию зависимостей.
+# FIXED: Removed incorrect import from loader.py. GameManager will now
+# be obtained through dependency injection.
 from durak.logic import actions
+from durak.logic.game_manager import GameManager
 from durak.objects.card import Card
 from durak.objects.errors import GameNotFoundError, NoGameInChatError
 
@@ -27,10 +28,10 @@ from durak.objects.errors import GameNotFoundError, NoGameInChatError
 from .game_callback import GameCallback
 
 router = Router()
-# gm = GameManager() # УДАЛЕНО: `gm` теперь импортируется из `loader`
+
 
 @router.message(F.text.regexp(r"^(Карта|Стікер): ([♦️♣️♥️♠️].*)$"))
-async def process_card_move_handler(message: types.Message):
+async def process_card_move_handler(message: types.Message, gm: GameManager):
     """
     ОБРАБОТЧИК ХОДА КАРТОЙ (ВРЕМЕННО СОХРАНЕН).
     
@@ -83,7 +84,7 @@ async def process_card_move_handler(message: types.Message):
 
 
 @router.callback_query(GameCallback.filter(F.action == "take"))
-async def take_cards_callback_handler(call: types.CallbackQuery, callback_data: GameCallback):
+async def take_cards_callback_handler(call: types.CallbackQuery, callback_data: GameCallback, gm: GameManager):
     """
     Обрабатывает нажатие на кнопку "Взять".
     
@@ -111,7 +112,7 @@ async def take_cards_callback_handler(call: types.CallbackQuery, callback_data: 
 
 
 @router.callback_query(GameCallback.filter(F.action == "pass"))
-async def pass_turn_callback_handler(call: types.CallbackQuery, callback_data: GameCallback):
+async def pass_turn_callback_handler(call: types.CallbackQuery, callback_data: GameCallback, gm: GameManager):
     """
     Обрабатывает нажатие на кнопку "Пас" (бито).
     

@@ -6,10 +6,10 @@ from durak.logic.game_manager import GameManager
 from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
 router = Router()
-gm = GameManager()
+
 
 @router.message(Command("global_leave", "gleave", "leave_all"))
-async def global_leave_handler(message: types.Message, bot: Bot):
+async def global_leave_handler(message: types.Message, bot: Bot, gm: GameManager):
     """
     Handles a user leaving any game they are currently participating in.
     This command can be sent in any chat (e.g., private messages with the bot).

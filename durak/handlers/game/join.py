@@ -34,10 +34,9 @@ from durak.objects import (
 from .game_callback import GameCallback
 
 router = Router()
-gm = GameManager()
 
 
-async def process_join(chat: types.Chat, user: types.User, game_id_from_callback: str = None):
+async def process_join(chat: types.Chat, user: types.User, gm: GameManager, game_id_from_callback: str = None):
     """
     Универсальная функция для обработки логики присоединения к игре.
     Вызывается как из обработчика команды, так и из обработчика callback\'а.
@@ -61,7 +60,7 @@ async def process_join(chat: types.Chat, user: types.User, game_id_from_callback
             return "Эта кнопка от другой игры, она больше не актуальна."
     except NoGameInChatError:
         # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
-        return f\'🚫 В этом чате нет игры! Создайте ее с помощью команды /{Commands.NEW}'
+        return f\'🚫 В этом чате нет игры! Создайте ее с помощью команды /{Commands.NEW}\'
 
     try:
         await gm.join_in_game(game, user)
@@ -74,7 +73,7 @@ async def process_join(chat: types.Chat, user: types.User, game_id_from_callback
         return f\'🚫 Достигнут лимит в {Config.MAX_PLAYERS} игроков!\'
     except AlreadyJoinedInGlobalError:
         # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
-        return f\'🚫 Вы уже играете в другом чате! Чтобы выйти, используйте /{Commands.GLEAVE}'
+        return f\'🚫 Вы уже играете в другом чате! Чтобы выйти, используйте /{Commands.GLEAVE}\'
     except AlreadyJoinedError:
         return \'🚫 Вы уже в игре!\'
     
@@ -82,13 +81,13 @@ async def process_join(chat: types.Chat, user: types.User, game_id_from_callback
 
 
 @router.message(Command(Commands.JOIN), F.chat.type.in_({'group', 'supergroup'}))
-async def join_command_handler(message: types.Message):
+async def join_command_handler(message: types.Message, gm: GameManager):
     """
     Обрабатывает команду /join.
     
     Handles the /join command.
     """
-    result = await process_join(message.chat, message.from_user)
+    result = await process_join(message.chat, message.from_user, gm)
     
     if isinstance(result, str):
         await message.answer(result)
@@ -100,7 +99,7 @@ async def join_command_handler(message: types.Message):
 
 
 @router.callback_query(GameCallback.filter(F.action == "join"))
-async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCallback):
+async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCallback, gm: GameManager):
     """
     Обрабатывает нажатие на inline-кнопку "Присоединиться".
     Обновляет сообщение с лобби, добавляя нового игрока в список.
@@ -122,7 +121,7 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     - Fixed imports and usage of command constants.
     - Restored the "Close Lobby" button and the correct button layout.
     """
-    result = await process_join(call.message.chat, call.from_user, callback_data.game_id)
+    result = await process_join(call.message.chat, call.from_user, gm, callback_data.game_id)
     
     if isinstance(result, str):
         await call.answer(result, show_alert=True)

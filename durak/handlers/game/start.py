@@ -37,7 +37,6 @@ from durak.objects.card import get_sticker_id
 from .game_callback import GameCallback
 
 router = Router()
-gm = GameManager()
 
 
 async def send_game_start_message(bot: Bot, chat_id: int, game: Game):
@@ -90,7 +89,7 @@ async def send_game_start_message(bot: Bot, chat_id: int, game: Game):
     await bot.send_message(chat_id, text, reply_markup=builder.as_markup())
 
 
-async def process_start(bot: Bot, chat: types.Chat, user: types.User, game_id_from_callback: str = None):
+async def process_start(bot: Bot, chat: types.Chat, user: types.User, gm: GameManager, game_id_from_callback: str = None):
     """
     Универсальная функция для обработки логики начала игры.
 
@@ -134,13 +133,13 @@ async def process_start(bot: Bot, chat: types.Chat, user: types.User, game_id_fr
     return game
 
 
-@router.message(Command(Commands.START), F.chat.type.in_({'group', 'supergroup'}))
-async def start_command_handler(message: types.Message, bot: Bot):
+@router.message(Command(Commands.START), F.chat.type.in_(({'group', 'supergroup'})))
+async def start_command_handler(message: types.Message, bot: Bot, gm: GameManager):
     """
     Обрабатывает команду /start для начала игры.
     Handles the /start command to begin a game.
     """
-    result = await process_start(bot, message.chat, message.from_user)
+    result = await process_start(bot, message.chat, message.from_user, gm)
     
     if isinstance(result, str):
         await message.answer(result)
@@ -151,12 +150,12 @@ async def start_command_handler(message: types.Message, bot: Bot):
 
 
 @router.callback_query(GameCallback.filter(F.action == "start"))
-async def start_callback_handler(call: types.CallbackQuery, callback_data: GameCallback, bot: Bot):
+async def start_callback_handler(call: types.CallbackQuery, callback_data: GameCallback, bot: Bot, gm: GameManager):
     """
     Обрабатывает нажатие на inline-кнопку "Начать игру".
     Handles the "Start Game" inline button press.
     """
-    result = await process_start(bot, call.message.chat, call.from_user, callback_data.game_id)
+    result = await process_start(bot, call.message.chat, call.from_user, gm, callback_data.game_id)
     
     if isinstance(result, str):
         await call.answer(result, show_alert=True)

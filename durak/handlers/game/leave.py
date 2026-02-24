@@ -7,13 +7,13 @@ from durak.logic.game_manager import GameManager
 from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
 router = Router()
-gm = GameManager()
+
 
 @router.message(
     Command("leave"),
     F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP})
 )
-async def leave_game_handler(message: types.Message):
+async def leave_game_handler(message: types.Message, gm: GameManager):
     """
     Handles a player leaving a game or lobby in the current chat.
     """

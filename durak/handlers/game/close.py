@@ -17,12 +17,11 @@ from durak.logic.game_manager import GameManager
 from .game_callback import GameCallback
 
 router = Router()
-gm = GameManager()
 
 
 @router.callback_query(GameCallback.filter(F.action == "close"))
 async def close_lobby_handler(
-    query: types.CallbackQuery, callback_data: GameCallback
+    query: types.CallbackQuery, callback_data: GameCallback, gm: GameManager
 ):
     """
     Обрабатывает закрытие лобби. Только создатель игры может это сделать.

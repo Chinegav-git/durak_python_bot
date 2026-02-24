@@ -15,14 +15,13 @@ from durak.logic.game_manager import GameManager
 from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
 router = Router()
-gm = GameManager()
 
 
 @router.message(
     F.left_chat_member,
     F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP})
 )
-async def auto_leave_on_chat_leave_handler(message: types.Message):
+async def auto_leave_on_chat_leave_handler(message: types.Message, gm: GameManager):
     """
     Автоматически исключает игрока из игры, если он покинул групповой чат.
 

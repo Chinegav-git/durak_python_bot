@@ -8,14 +8,14 @@ from durak.logic.game_manager import GameManager
 from durak.objects.errors import NoGameInChatError, NotEnoughPlayersError
 
 router = Router()
-gm = GameManager()
+
 
 @router.message(
     Command("kick"),
     F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}),
     F.reply_to_message
 )
-async def kick_in_game_handler(message: types.Message):
+async def kick_in_game_handler(message: types.Message, gm: GameManager):
     """
     Handles the /kick command during an active game.
     Requires a reply to the message of the user to be kicked.
