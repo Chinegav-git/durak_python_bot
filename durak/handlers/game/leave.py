@@ -34,7 +34,7 @@ async def leave_game_handler(message: types.Message, gm: GameManager):
         await message.answer("🚫 Ви не берете участь у грі в цьому чаті.")
         return
 
-    mention = user.get_mention(as_html=True)
+    mention = user.first_name
 
     try:
         # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию

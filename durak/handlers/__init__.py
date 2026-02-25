@@ -10,7 +10,7 @@ It aggregates all routers from child modules and subpackages into a single main 
 from aiogram import Router
 
 
-def setup() -> Router:
+def setup(game_manager=None) -> Router:
     """
     Настраивает и возвращает главный роутер для всех обработчиков.
 
@@ -40,7 +40,7 @@ def setup() -> Router:
 
     # Настройка и получение роутеров из подпакетов
     # Setup and get routers from subpackages
-    game_router = setup_game()
+    game_router = setup_game(game_manager)
     info_router = setup_info()
 
     # Включение роутеров из подпакетов в главный роутер
@@ -58,15 +58,3 @@ def setup() -> Router:
         router_instance.include_router(module.router)
 
     return router_instance
-
-# ИСПРАВЛЕНО: `router` теперь является переменной на уровне модуля.
-# FIXED: `router` is now a module-level variable.
-# БЫЛО / WAS:
-# `router` был скрыт внутри функции `setup()`, что приводило к `ImportError` в `bot.py`.
-# `router` was hidden inside the `setup()` function, which caused an `ImportError` in `bot.py`.
-# СТАЛО / NOW:
-# Мы вызываем `setup()` и присваиваем результат переменной `router`,
-# делая ее доступной для импорта из других модулей.
-# We call `setup()` and assign the result to the `router` variable,
-# making it available for import from other modules.
-router = setup()

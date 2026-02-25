@@ -107,6 +107,7 @@ class Commands:
     HELP: str = 'help'
     START_BOT: str = 'start'
     STATS: str = 'stats'
+    SETTINGS: str = 'settings'
     OFF_STATS: str = 'off_stats'
     ON_STATS: str = 'on_stats'
     TEST_WIN: str = 'test_win'

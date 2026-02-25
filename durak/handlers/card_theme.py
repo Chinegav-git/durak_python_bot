@@ -11,7 +11,7 @@ from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from durak.db.models import ChatSetting
+from durak.db.models import Chat, ChatSetting
 from .settings_callback import SettingsCallback
 
 router = Router()
@@ -46,7 +46,8 @@ async def get_card_theme_keyboard(chat_id: int):
     Generates the keyboard for card theme settings.
     Marks the currently selected theme.
     """
-    cs, _ = await ChatSetting.get_or_create(id=chat_id)
+    chat, _ = await Chat.get_or_create(id=chat_id)
+    cs, _ = await ChatSetting.get_or_create(chat=chat)
     current_theme = cs.card_theme
     builder = InlineKeyboardBuilder()
 
@@ -54,7 +55,7 @@ async def get_card_theme_keyboard(chat_id: int):
     if not available_themes:
         # Если темы не найдены, добавляем сообщение об ошибке
         builder.row(types.InlineKeyboardButton(
-            text="⚠️ Темы не найдены!",
+            text="⚠️ Теми не знайдено!",
             callback_data="ignore"
         ))
     else:
@@ -81,7 +82,8 @@ async def set_card_theme(message: types.Message):
     Handler for the /cardtheme command.
     Informs the user about the current theme and suggests using /settings to change it.
     """
-    chat_setting, _ = await ChatSetting.get_or_create(id=message.chat.id)
+    chat, _ = await Chat.get_or_create(id=message.chat.id)
+    chat_setting, _ = await ChatSetting.get_or_create(chat=chat)
     current_theme = chat_setting.card_theme
 
     await message.answer(
@@ -115,7 +117,8 @@ async def set_card_theme_callback(call: types.CallbackQuery, callback_data: Sett
     new_theme = callback_data.value
     chat_id = call.message.chat.id
 
-    chat_setting, _ = await ChatSetting.get_or_create(id=chat_id)
+    chat, _ = await Chat.get_or_create(id=chat_id)
+    chat_setting, _ = await ChatSetting.get_or_create(chat=chat)
     if chat_setting.card_theme != new_theme:
         chat_setting.card_theme = new_theme
         await chat_setting.save()

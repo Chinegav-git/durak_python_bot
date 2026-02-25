@@ -7,7 +7,7 @@ Handler for getting a sticker's ID.
 
 from aiogram import Router, types, F
 from durak.filters.is_admin import IsAdminFilter
-from durak.db.models import ChatSetting
+from durak.db.models import Chat, ChatSetting
 
 router = Router()
 
@@ -31,7 +31,8 @@ async def get_sticker_id(message: types.Message):
     if the corresponding option is enabled in the chat settings.
     Only for global bot administrators.
     """
-    settings, _ = await ChatSetting.get_or_create(id=message.chat.id)
+    chat, _ = await Chat.get_or_create(id=message.chat.id)
+    settings, _ = await ChatSetting.get_or_create(chat=chat)
 
     # Проверяем, включена ли функция в настройках чата
     # Check if the feature is enabled in the chat settings
@@ -40,4 +41,4 @@ async def get_sticker_id(message: types.Message):
 
     # Если все проверки пройдены, отвечаем ID стикера
     # If all checks pass, reply with the sticker ID
-    await message.reply(f"Sticker ID:\n`{message.sticker.file_id}`", parse_mode="Markdown")
+    await message.reply(f"ID стикера:\n`{message.sticker.file_id}`", parse_mode="Markdown")

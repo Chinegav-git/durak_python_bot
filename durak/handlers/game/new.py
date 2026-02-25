@@ -65,33 +65,33 @@ async def new_game_handler(message: types.Message, gm: GameManager):
         game = await gm.new_game(chat, creator=user)
     except GameAlreadyInChatError:
         # ИСПРАВЛЕНО: Текст переведен на русский.
-        await message.answer('🚫 В этом чате уже есть игра.')
+        await message.answer('🚫 У цьому чаті вже є гра.')
         return
     except AlreadyJoinedInGlobalError:
         # ИСПРАВЛЕНО: Текст переведен на русский.
-        await message.answer('🚫 Вы уже находитесь в другой игре.')
+        await message.answer('🚫 Ви вже знаходитесь в іншій грі.')
         return
 
     # ИСПРАВЛЕНО: Создание клавиатуры с использованием .pack()
     builder = InlineKeyboardBuilder()
     builder.button(
-        text='👋 Присоединиться',
+        text='👋 Приєднатися',
         callback_data=GameCallback(action="join", game_id=str(game.id)).pack()
     )
     builder.button(
-        text='🚀 Начать игру',
+        text='🚀 Почати гру',
         callback_data=GameCallback(action="start", game_id=str(game.id)).pack()
     )
     builder.button(
-        text='🔒 Закрыть лобби',
+        text='🔒 Закрити лобі',
         callback_data=GameCallback(action="close", game_id=str(game.id)).pack()
     )
     builder.adjust(1, 2)
     
     # ИСПРАВЛЕНО: Текст переведен на русский.
     await message.answer(
-        f'🎮 Игра создана!\n'
-        f'👤 Создатель: {user.get_mention(as_html=True)}\n\n'
-        f'Используйте кнопки ниже для управления игрой:',
+        f'🎮 Гру створено!\n'
+        f'👤 Створив: {user.first_name}\n\n'
+        f'Використовуйте кнопки нижче для керування грою:',
         reply_markup=builder.as_markup()
     )

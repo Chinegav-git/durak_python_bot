@@ -42,7 +42,7 @@ async def global_leave_handler(message: types.Message, bot: Bot, gm: GameManager
         )
         return
 
-    mention = user.get_mention(as_html=True)
+    mention = user.first_name
     game_chat_id = game.id
     chat_title = game.chat_title_or_id()
 

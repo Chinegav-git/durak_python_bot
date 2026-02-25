@@ -17,7 +17,7 @@ This package contains all handlers related to the gameplay.
 
 from aiogram import Router
 
-def setup() -> Router:
+def setup(game_manager=None) -> Router:
     """
     Настраивает и возвращает главный роутер для всех игровых обработчиков.
 
@@ -51,6 +51,13 @@ def setup() -> Router:
     )
 
     router = Router()
+
+    # Ініціалізуємо gm у всіх модулях, які його потребують
+    # Initialize gm in all modules that need it
+    if game_manager:
+        kill.gm = game_manager
+        lobby_kick.gm = game_manager
+        test_win.gm = game_manager
 
     # Регистрация всех игровых роутеров
     # Register all game routers

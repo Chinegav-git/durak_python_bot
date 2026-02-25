@@ -40,7 +40,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 # FIXED (refactoring): Removed `CHOISE` and `gm` import from the deprecated `loader` module.
 # # Global GameManager <-- Old comment saved for history.
 # The GameManager dependency is now injected via function arguments.
-from ..db.models import ChatSetting, UserSetting # ИСПРАВЛЕНО: Убран неиспользуемый UserSetting
+from ..db.models import Chat, ChatSetting, UserSetting # ИСПРАВЛЕНО: Убран неиспользуемый UserSetting
 from ..handlers.game.game_callback import GameCallback
 from ..logic.game_manager import GameManager
 from ..objects import Card, Game, Player
@@ -211,7 +211,7 @@ async def do_leave_player(game: Game, player: Player, gm: GameManager, from_turn
         await do_turn(game, gm, skip_def=was_defender)
 
 
-async def do_pass(game: Game, player: Player, gm: GameManager):
+async def do_pass(game: Game, player: Player, gm: GameManager, bot: Bot):
     """
     Обрабатывает действие "Пас" от атакующего игрока.
     
@@ -223,8 +223,9 @@ async def do_pass(game: Game, player: Player, gm: GameManager):
     game.is_pass = True
     await gm.save_game(game)
     
-    bot = Bot.get_current()
-    msg = await bot.send_message(game.id, f"Пас! {player.mention} больше не подкидывает в этом раунде.")
+    # bot должен передаваться как параметр
+    # bot = Bot.get_current()  # Этот метод не существует в aiogram 3.x
+    msg = await bot.send_message(game.id, f"Пас! {player.first_name} більше не підкидає в цьому раунді.")
     if msg:
         asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 7))
 
@@ -288,7 +289,8 @@ async def _get_attack_settings(chat_id: int):
     Gets the chat settings required for an attack (display mode, card theme).
     FIXED: Removed non-functional statistics logic.
     """
-    cs, _ = await ChatSetting.get_or_create(chat_id=chat_id)
+    chat, _ = await Chat.get_or_create(id=chat_id)
+    cs, _ = await ChatSetting.get_or_create(chat=chat)
     return cs.game_mode, cs.card_theme
 
 

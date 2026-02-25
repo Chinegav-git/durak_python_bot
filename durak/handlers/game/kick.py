@@ -52,8 +52,8 @@ async def kick_in_game_handler(message: types.Message, gm: GameManager):
         await message.reply("🚫 Неможливо виключити творця гри.")
         return
 
-    kicked_mention = kicked_user.get_mention(as_html=True)
-    kicker_mention = kicker_user.get_mention(as_html=True)
+    kicked_mention = kicked_user.first_name
+    kicker_mention = kicker_user.first_name
 
     try:
         # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию

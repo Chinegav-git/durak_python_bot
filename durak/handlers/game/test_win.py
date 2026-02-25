@@ -1,9 +1,13 @@
-from aiogram import types
-from loader import dp, gm, Commands
+from aiogram import F, Router, types
+from aiogram.filters import Command
+from config import Commands
 from durak.objects import NoGameInChatError
 
+router = Router()
+gm = None  # Will be initialized later
 
-@dp.message_handler(commands=[Commands.TEST_WIN], is_admin=True)
+
+@router.message(Command(Commands.TEST_WIN))
 async def test_win(message: types.Message):
     """
     Handler for /test_win command to instantly end the game with a winner.

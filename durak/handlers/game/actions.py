@@ -103,15 +103,15 @@ async def take_cards_callback_handler(call: types.CallbackQuery, callback_data: 
         player = game.player_for_id(call.from_user.id)
 
         if not player or player != game.opponent_player:
-            await call.answer("Только защищающийся игрок может взять карты.", show_alert=True)
+            await call.answer("Лише захисаючий гравець може взяти карти.", show_alert=True)
             return
 
         # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию
         await actions.do_draw(game, player, gm)
-        await call.answer("Вы взяли карты со стола.")
+        await call.answer("Ви взяли карти зі стола.")
     
     except (NoGameInChatError, ValueError):
-        await call.answer("Игра не найдена или уже завершена.", show_alert=True)
+        await call.answer("Гру не знайдено або вже завершена.", show_alert=True)
 
 
 @router.callback_query(GameCallback.filter(F.action == "pass"))
@@ -132,12 +132,12 @@ async def pass_turn_callback_handler(call: types.CallbackQuery, callback_data: G
         player = game.player_for_id(call.from_user.id)
 
         if not player or player not in (game.current_player, game.support_player):
-            await call.answer("Сейчас не ваш ход, чтобы пасовать.", show_alert=True)
+            await call.answer("Зараз не ваш хід, щоб пасувати.", show_alert=True)
             return
         
-        # ИСПРАВЛЕНО (рефакторинг): Передаем gm в функцию
-        await actions.do_pass(game, player, gm)
+        # ИСПРАВЛЕНО (рефакторинг): Передаем gm и bot в функцию
+        await actions.do_pass(game, player, gm, call.bot)
         await call.answer("Пас!")
             
     except (NoGameInChatError, ValueError):
-        await call.answer("Игра не найдена или уже завершена.", show_alert=True)
+        await call.answer("Гру не знайдено або вже завершена.", show_alert=True)

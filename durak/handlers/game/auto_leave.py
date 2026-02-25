@@ -65,7 +65,7 @@ async def auto_leave_on_chat_leave_handler(message: types.Message, gm: GameManag
     if not player_to_remove:
         return  # Пользователь, покинувший чат, не был игроком.
 
-    mention = user_left.get_mention(as_html=True)
+    mention = user_left.first_name
 
     try:
         await actions.do_leave_player(game, player_to_remove)

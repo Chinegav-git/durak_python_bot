@@ -30,7 +30,7 @@ from durak.objects import (
     NoGameInChatError, 
     NotEnoughPlayersError
 )
-from durak.objects.card import get_sticker_id
+from durak.objects.theme import get_sticker_id
 
 # ИСПРАВЛЕНО: Корректный импорт GameCallback
 # FIXED: Correct import of GameCallback
@@ -61,7 +61,7 @@ async def send_game_start_message(bot: Bot, chat_id: int, game: Game):
     FIXED (stabilization):
     - DB query replaced from PonyORM to asynchronous Tortoise-ORM.
     """
-    settings = await ChatSetting.get_or_none(id=chat_id)
+    settings = await ChatSetting.get_or_none(chat_id=chat_id)
     theme_name = settings.card_theme if settings else 'classic'
     
     trump_sticker_id = get_sticker_id(game.trump.value, theme_name)
@@ -72,18 +72,18 @@ async def send_game_start_message(bot: Bot, chat_id: int, game: Game):
     current = game.current_player
     opponent = game.opponent_player
     text = (
-        f'🎯 <b>Начало раунда</b>\n\n'
-        f'⚔️ Атакует: {current.get_mention(as_html=True)} (🃏{len(current.cards)})\n'
-        f'🛡️ Защищается: {opponent.get_mention(as_html=True)} (🃏{len(opponent.cards)})\n\n'
-        f'🃏 Козырь: {game.deck.trump_ico}\n'
-        f'🃏 В колоде: {len(game.deck.cards)} карт'
+        f'🎯 <b>Початок раунду</b>\n\n'
+        f'⚔️ Атакує: {current.first_name} (🃏{len(current.cards)})\n'
+        f'🛡️ Захищається: {opponent.first_name} (🃏{len(opponent.cards)})\n\n'
+        f'🃏 Козир: {game.deck.trump_ico}\n'
+        f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
     
     # ИСПРАВЛЕНО: Клавиатура-заглушка заменена на рабочую временную клавиатуру
     builder = InlineKeyboardBuilder()
-    builder.button(text="🃏 Мои карты", callback_data=GameCallback(action="my_cards", game_id=str(game.id)).pack())
+    builder.button(text="🃏 Мої карти", callback_data=GameCallback(action="my_cards", game_id=str(game.id)).pack())
     builder.button(text="✅ Пас", callback_data=GameCallback(action="pass", game_id=str(game.id)).pack())
-    builder.button(text="📥 Взять", callback_data=GameCallback(action="take", game_id=str(game.id)).pack())
+    builder.button(text="📥 Взяти", callback_data=GameCallback(action="take", game_id=str(game.id)).pack())
     builder.adjust(1)
     
     await bot.send_message(chat_id, text, reply_markup=builder.as_markup())

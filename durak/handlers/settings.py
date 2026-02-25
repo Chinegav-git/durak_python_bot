@@ -45,7 +45,7 @@ async def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.Inli
 
     # Кнопка для перехода в меню выбора режима игры
     builder.button(
-        text="✍️ Режим игры",
+        text="✍️ Режим гри",
         callback_data=SettingsCallback(level="gamemode").pack()
     )
 
@@ -62,7 +62,7 @@ async def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.Inli
         sticker_helper_status = "✅" if cs.sticker_id_helper else "❌"
         
         builder.button(
-            text=f"👨‍💻 Помощник ID стикеров ({sticker_helper_status})",
+            text=f"👨‍💻 Помічник ID стикерів ({sticker_helper_status})",
             callback_data=SettingsCallback(level="toggle_sticker_helper").pack(),
         )
     

@@ -93,7 +93,7 @@ async def join_command_handler(message: types.Message, gm: GameManager):
         await message.answer(result)
     else:
         # ИСПРАВЛЕНО: Текст переведен.
-        await message.answer(f'👋 {message.from_user.get_mention(as_html=True)} присоединился к игре!')
+        await message.answer(f'👋 {message.from_user.first_name} приєднався до гри!')
         # TODO: После присоединения по команде, хорошо бы обновить сообщение с лобби.
         # Это потребует хранения message_id лобби в объекте игры.
 
@@ -129,10 +129,10 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
 
     game = result
     # ИСПРАВЛЕНО: Текст переведен.
-    await call.answer(f'👋 {call.from_user.first_name}, вы присоединились к игре!', show_alert=False)
+    await call.answer(f'👋 {call.from_user.first_name}, ви приєдналися до гри!', show_alert=False)
     
     players_list = '\n'.join([
-        f'{i + 1}. {player.get_mention(as_html=True)}'
+        f'{i + 1}. {player.first_name}'
         for i, player in enumerate(game.players)
     ])
     
@@ -140,15 +140,15 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     # ИСПРАВЛЕНО: Восстановлена кнопка "Закрыть лобби" и расстановка adjust(1, 2)
     builder = InlineKeyboardBuilder()
     builder.button(
-        text='👋 Присоединиться', 
+        text='👋 Приєднатися', 
         callback_data=GameCallback(action="join", game_id=str(game.id)).pack()
     )
     builder.button(
-        text='🚀 Начать игру', 
+        text='🚀 Почати гру', 
         callback_data=GameCallback(action="start", game_id=str(game.id)).pack()
     )
     builder.button(
-        text='🔒 Закрыть лобби',
+        text='🔒 Закрити лобі',
         callback_data=GameCallback(action="close", game_id=str(game.id)).pack()
     )
     builder.adjust(1, 2)
@@ -156,9 +156,9 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     with suppress(TelegramBadRequest):
         # ИСПРАВЛЕНО: Текст сообщения лобби переведен на русский.
         await call.message.edit_text(
-            f'🎮 Игра создана!\n'
-            f'👤 Создатель: {game.creator.get_mention(as_html=True)}\n\n'
-            f'<b>Игроки:</b>\n{players_list}\n\n'
-            f'Используйте кнопки ниже для управления игрой:',
+            f'🎮 Гру створено!\n'
+            f'👤 Створив: {game.creator.first_name}\n\n'
+            f'<b>Гравці:</b>\n{players_list}\n\n'
+            f'Використовуйте кнопки нижче для керування грою:',
             reply_markup=builder.as_markup()
         )

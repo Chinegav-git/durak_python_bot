@@ -221,7 +221,8 @@ class GameManager:
         )
 
         # Устанавливаем флаг в БД и блокировку в Redis
-        cs, _ = await ChatSetting.get_or_create(chat_id=chat.id)
+        chat, _ = await Chat.get_or_create(id=chat.id)
+        cs, _ = await ChatSetting.get_or_create(chat=chat)
         cs.is_game_active = True
         await cs.save()
         await self.redis.set(self._user_game_key(creator.id), chat.id)

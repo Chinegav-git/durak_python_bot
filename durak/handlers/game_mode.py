@@ -10,7 +10,7 @@ from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from durak.db.models import ChatSetting
+from durak.db.models import Chat, ChatSetting
 from .settings_callback import SettingsCallback # ИСПРАВЛЕНО: Прямой импорт
 
 router = Router()
@@ -22,7 +22,8 @@ async def get_gamemode_keyboard(chat_id: int):
     Generates the keyboard for game mode settings.
     Marks the currently selected mode.
     """
-    cs, _ = await ChatSetting.get_or_create(id=chat_id)
+    chat, _ = await Chat.get_or_create(id=chat_id)
+    cs, _ = await ChatSetting.get_or_create(chat=chat)
     current_mode = cs.game_mode
 
     # Словарь доступных режимов игры
@@ -66,12 +67,13 @@ async def set_game_mode(message: types.Message):
     Handler for the /gamemode command.
     Informs the user about the current mode and suggests using /settings to change it.
     """
-    chat_setting, _ = await ChatSetting.get_or_create(id=message.chat.id)
+    chat, _ = await Chat.get_or_create(id=message.chat.id)
+    chat_setting, _ = await ChatSetting.get_or_create(chat=chat)
     current_mode = chat_setting.game_mode
 
     await message.answer(
-        f"Текущий режим игры: `{current_mode}`.\n\n"
-        f"Чтобы изменить режим, воспользуйтесь меню /settings.",
+        f"Поточний режим гри: `{current_mode}`.\n\n"
+        f"Щоб змінити режим, скористайтеся меню /settings.",
         parse_mode='Markdown'
     )
 
@@ -83,7 +85,7 @@ async def show_gamemode_settings(call: types.CallbackQuery):
     Shows the game mode selection menu when the button in settings is pressed.
     """
     await call.message.edit_text(
-        "✍️ **Режим игры**\n\nВыберите, как будут отображаться карты и игровой процесс:",
+        "✍️ **Режим гри**\n\nВиберіть, як будуть відображатися карти та ігровий процес:",
         reply_markup=await get_gamemode_keyboard(call.message.chat.id)
     )
     await call.answer()
@@ -100,11 +102,12 @@ async def set_gamemode_callback(call: types.CallbackQuery, callback_data: Settin
     new_mode = callback_data.value
     chat_id = call.message.chat.id
 
-    chat_setting, _ = await ChatSetting.get_or_create(id=chat_id)
+    chat, _ = await Chat.get_or_create(id=chat_id)
+    chat_setting, _ = await ChatSetting.get_or_create(chat=chat)
     if chat_setting.game_mode != new_mode:
         chat_setting.game_mode = new_mode
         await chat_setting.save()
-        await call.answer("✅ Режим игры изменен")
+        await call.answer("✅ Режим гри змінено")
         
         # Обновление клавиатуры для отображения нового выбора
         # Update the keyboard to show the new selection
@@ -112,4 +115,4 @@ async def set_gamemode_callback(call: types.CallbackQuery, callback_data: Settin
             reply_markup=await get_gamemode_keyboard(chat_id)
         )
     else:
-        await call.answer("Этот режим уже установлен")
+        await call.answer("Цей режим вже встановлено")

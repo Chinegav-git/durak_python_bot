@@ -7,7 +7,7 @@ from durak.logic.game_manager import GameManager
 from durak.objects import NoGameInChatError
 
 router = Router()
-gm = GameManager()
+gm = None  # Will be initialized later
 
 @router.message(
     Command("kill", "stopgame", "endgame"),
@@ -28,7 +28,7 @@ async def kill_game_handler(message: types.Message):
         return
 
     # Permission check: must be creator or chat admin
-    is_admin = await IsAdminFilter()(message)
+    is_admin = await IsAdminFilter(is_admin=True)(message)
     if not (user.id == game.creator_id or is_admin):
         await message.answer(
             "🚫 Ви не можете завершити гру! "
@@ -39,5 +39,5 @@ async def kill_game_handler(message: types.Message):
     # End the game
     await gm.end_game(game)
 
-    mention = user.get_mention(as_html=True)
+    mention = user.first_name
     await message.answer(f"🛑 {mention} примусово завершив(ла) гру!")

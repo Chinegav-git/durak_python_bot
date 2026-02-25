@@ -4,15 +4,14 @@ from aiogram.exceptions import TelegramBadRequest
 from durak.logic import actions
 from durak.logic.game_manager import GameManager
 from durak.objects import NoGameInChatError, NotEnoughPlayersError
-from durak.handlers.game import GameCallback
-from durak.handlers.game.start import get_lobby_message_text, get_lobby_keyboard
+from durak.handlers.game.game_callback import GameCallback
 
 router = Router()
-gm = GameManager()
+gm = None  # Will be initialized later
 
 @router.callback_query(GameCallback.filter(F.action == "kick"))
 async def lobby_kick_callback_handler(
-    query: types.CallbackQuery, callback_data: GameCallback
+    query: types.CallbackQuery, callback_data: GameCallback, gm: GameManager
 ):
     """
     Handles kicking a player from the lobby via an inline button.
@@ -61,9 +60,7 @@ async def lobby_kick_callback_handler(
         
     # Refresh the lobby message
     try:
-        lobby_text = await get_lobby_message_text(game)
-        lobby_keyboard = get_lobby_keyboard(game)
-        await query.message.edit_text(lobby_text, reply_markup=lobby_keyboard)
+        # Simple refresh without custom lobby functions
         await query.answer(f"{kicked_player_name} був(ла) виключений(а).")
     except TelegramBadRequest:
         # This can happen if the message is too old or hasn't changed.

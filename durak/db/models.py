@@ -14,7 +14,7 @@ class User(models.Model):
     """
     # Уникальный идентификатор пользователя (Telegram ID)
     # Unique user identifier (Telegram ID)
-    id = fields.IntField(pk=True)
+    id = fields.BigIntField(pk=True)
 
     # Имя пользователя
     # User's first name
@@ -28,6 +28,9 @@ class User(models.Model):
     # User's Telegram username (optional)
     username = fields.CharField(max_length=255, null=True)
 
+    class Meta:
+        table = "users"
+
 
 class Chat(models.Model):
     """
@@ -36,7 +39,7 @@ class Chat(models.Model):
     """
     # Уникальный идентификатор чата (Telegram ID)
     # Unique chat identifier (Telegram ID)
-    id = fields.IntField(pk=True)
+    id = fields.BigIntField(pk=True)
 
     # Название чата
     # Chat title
@@ -45,6 +48,9 @@ class Chat(models.Model):
     # Тип чата (например, 'private', 'group', 'supergroup')
     # Chat type (e.g., 'private', 'group', 'supergroup')
     type = fields.CharField(max_length=255)
+
+    class Meta:
+        table = "chats"
 
 
 class Game(models.Model):
@@ -56,7 +62,7 @@ class Game(models.Model):
     """
     # Уникальный идентификатор игры
     # Unique game identifier
-    id = fields.IntField(pk=True)
+    id = fields.BigIntField(pk=True)
 
     # Внешний ключ на чат, в котором проходит игра
     # Foreign key to the chat where the game is being played
@@ -69,6 +75,9 @@ class Game(models.Model):
     # Текущий статус игры (например, 'lobby', 'playing', 'finished')
     # Current status of the game (e.g., 'lobby', 'playing', 'finished')
     status = fields.CharField(max_length=255)
+
+    class Meta:
+        table = "games"
 
 class UserSetting(models.Model):
     """
@@ -92,6 +101,9 @@ class UserSetting(models.Model):
     cards_played = fields.IntField(default=0)
     cards_beaten = fields.IntField(default=0)
     cards_attack = fields.IntField(default=0)
+
+    class Meta:
+        table = "usersettings"
 
 
 class ChatSetting(models.Model):
@@ -118,3 +130,6 @@ class ChatSetting(models.Model):
     # Флаг, указывающий, активна ли игра в данный момент в чате.
     # Flag indicating whether a game is currently active in the chat.
     is_game_active = fields.BooleanField(default=False)
+
+    class Meta:
+        table = "chatsettings"
