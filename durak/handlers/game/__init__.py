@@ -48,6 +48,7 @@ def setup(game_manager=None) -> Router:
         new,
         start,
         test_win,
+        process_chosen,
     )
 
     router = Router()
@@ -74,6 +75,7 @@ def setup(game_manager=None) -> Router:
         new,
         start,
         test_win,
+        process_chosen,
     ):
         router.include_router(module.router)
 
