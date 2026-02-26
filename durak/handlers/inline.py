@@ -5,12 +5,16 @@
 Handlers for inline queries to display cards and actions.
 """
 
-from aiogram import Router, types, F
-from aiogram.types import InlineQueryResultArticle, InputTextMessageContent, InlineQueryResultCachedSticker as Sticker
+from aiogram import F, Router, types
+from aiogram.types import (
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    InlineQueryResultCachedSticker as Sticker
+)
 
-from durak.logic.game_manager import GameManager
 from durak.logic import result
-from durak.objects import NoGameInChatError, Card
+from durak.logic.game_manager import GameManager
+from durak.objects import Card, NoGameInChatError
 from durak.objects import theme as th
 from durak.utils.i18n import t
 
@@ -18,89 +22,84 @@ router = Router()
 
 
 @router.inline_query()
-async def inline_query_handler(query: types.InlineQuery, gm: GameManager):
+async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l, m):
     """
-    Обрабатывает инлайн запросы для отображения карт и игровых действий.
-    
-    Handles inline queries for displaying cards and game actions.
+    Обрабатывает все инлайн-запросы.
+
+    В зависимости от состояния игры и ввода пользователя, этот обработчик
+    формирует и отправляет список инлайн-результатов, которые могут включать:
+    - Карты в руке игрока (активные и неактивные).
+    - Кнопки действий (Взять, Пас).
+    - Информационные сообщения (игра не найдена, игра не началась, и т.д.).
+
+    Handles all inline queries.
+
+    Depending on the game state and user input, this handler generates
+    and sends a list of inline results, which may include:
+    - Cards in the player's hand (active and inactive).
+    - Action buttons (Draw, Pass).
+    - Informational messages (game not found, game not started, etc.).
     """
     user = query.from_user
-    results = []  # Инициализация списка результатов
-    
+    results = []
+
     try:
         game = await gm.get_game_by_user_id(user.id)
-        if not game or not game.started:
+        if not game:
             result.add_no_game(results)
+            await query.answer(results, is_personal=True, cache_time=1)
+            return
+
+        if not game.started:
+            result.add_not_started(results)
             await query.answer(results, is_personal=True, cache_time=1)
             return
 
         player = game.player_for_id(user.id)
-        if not player:
-            result.add_no_game(results)
-            await query.answer(results, is_personal=True, cache_time=1)
-            return
-
         from durak.logic.actions import _get_attack_settings
         display_mode, theme_name = await _get_attack_settings(game.id)
 
-        if not query.query:
-            # Показываем только те карты, которыми игрок реально может ходить
-            playable_cards = player.playable_card_atk(game)
+        # Показываем игроку его карты и возможные действия
+        # Show the player their cards and possible actions
+        if player.can_play:
+            if game.field: # Если на столе есть карты
+                if player.is_attacker:
+                    # Атакующий может подкинуть или сказать "пас"
+                    for card in player.cards:
+                        result.add_card(
+                            game, card, results, player.can_add_card(card), theme_name
+                        )
+                    result.add_pass(game, results, theme_name)
+                else:
+                    # Защищающийся может побить или взять
+                    for atk_card, def_card in game.field.items():
+                        if def_card: continue
+                        for card in player.cards:
+                            result.add_card(
+                                game, atk_card, results, player.can_beat(atk_card, card), theme_name, def_card=card
+                            )
+                    result.add_draw(game, player, results, theme_name)
+            else:
+                # Если стол пуст, атакующий может походить любой картой
+                for card in player.cards:
+                    result.add_card(game, card, results, True, theme_name)
+        else:
+            # Если не ход игрока, показываем ему серые карты и инфо
             for card in player.cards:
-                if card not in playable_cards:
-                    continue
-
-                style = 'trump_normal' if card.suit == game.trump else 'normal'
-                sticker_id = th.get_sticker_id(repr(card), theme_name, style=style)
-                if sticker_id:
-                    # Отправляем только стикер, без текстовой команды в чат.
-                    results.append(
-                        Sticker(
-                            id=f"attack|{repr(card)}",
-                            sticker_file_id=sticker_id,
-                        )
-                    )
-
-            if player == game.current_player and game.field:
-                # Атакующий может нажать "Пас"
-                result.add_pass(results, game, theme_name)
-            elif player == game.opponent_player and game.field:
-                # Защищающийся может нажать "Взять"
-                result.add_draw(player, results, theme_name)
-
-        elif query.query.startswith('beat_'):
-            # Показываем карты для защиты
-            atk_card_str = query.query[5:]
-            atk_card = Card.from_repr(atk_card_str)
-
-            for def_card in player.cards:
-                # Используем корректную проверку возможности побить карту
-                if not player.can_beat(game, atk_card, def_card):
-                    continue
-
-                style = 'trump_normal' if def_card.suit == game.trump else 'normal'
-                sticker_id = th.get_sticker_id(repr(def_card), theme_name, style=style)
-                if sticker_id:
-                    results.append(
-                        Sticker(
-                            id=f"defend|{repr(atk_card)}|{repr(def_card)}",
-                            sticker_file_id=sticker_id,
-                        )
-                    )
-            # Для защищающегося также добавляем возможность "Взять"
-            result.add_draw(player, results, theme_name)
+                result.add_card(game, card, results, False, theme_name)
+            result.add_gameinfo(game, results, theme_name)
 
     except NoGameInChatError:
         result.add_no_game(results)
-    except Exception as e:
-        results.append(
-            InlineQueryResultArticle(
-                id="error",
-                title="🚫 Ошибка",
-                input_message_content=InputTextMessageContent(
-                    message_text=f"🚫 Произошла ошибка: {str(e)}"
-                ),
-            )
-        )
     
+    except Exception as e:
+        # В случае непредвиденной ошибки, сообщаем об этом пользователю
+        # In case of an unexpected error, inform the user
+        error_message = f"Произошла ошибка: {e}"
+        results.append(InlineQueryResultArticle(
+            id="error",
+            title="🚫 Ошибка",
+            input_message_content=InputTextMessageContent(error_message)
+        ))
+
     await query.answer(results, is_personal=True, cache_time=1)
