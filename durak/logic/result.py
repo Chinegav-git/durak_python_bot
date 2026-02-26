@@ -70,8 +70,8 @@ def add_draw(player: Player, results: List[InlineQueryResult], theme_name: str):
         Sticker(
             id="draw",
             sticker_file_id=sticker_id,
-            input_message_content=
-            InputTextMessageContent(f"🎴 {player.user.get_mention(as_html=True)} взяв(а) карти!")
+            # При выборе этого варианта в чат уходит простое инфо-сообщение без упоминания игрока
+            input_message_content=InputTextMessageContent("🎴 Взять карты"),
         )
     )
 
@@ -86,9 +86,7 @@ def add_pass(results: List[InlineQueryResult], game: Game, theme_name: str):
         Sticker(
             id="pass",
             sticker_file_id=sticker_id,
-            input_message_content=InputTextMessageContent(
-                '✅ Пас'
-            )
+            input_message_content=InputTextMessageContent("✅ Пас"),
         )
     )
 
@@ -162,5 +160,6 @@ def game_info(game: Game):
         f"🎯 <b>Козир:</b> {game.deck.trump_ico}\n"
         f"📦 <b>В колоді:</b> {len(game.deck.cards)} карт\n\n"
         f"<b>👥 Гравці:</b>{pleyers_info}\n"
-        f"<b>🏟️ Поле:</b>\n{field_info if field else '  тут пусто~'}\n"
+        f"<b>🏟️ Поле:</b>\n{field_info if field else '  тут пусто~'}\n",
+        parse_mode="HTML",
     )

@@ -44,26 +44,29 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager):
         display_mode, theme_name = await _get_attack_settings(game.id)
 
         if not query.query:
-            # Показываем карты для атаки или подкидывания
+            # Показываем только те карты, которыми игрок реально может ходить
+            playable_cards = player.playable_card_atk(game)
             for card in player.cards:
-                if player.can_attack(game, card):
-                    style = 'trump_normal' if card.suit == game.trump else 'normal'
-                    sticker_id = th.get_sticker_id(repr(card), theme_name, style=style)
-                    if sticker_id:
-                        results.append(
-                            Sticker(
-                                id=f"attack_{repr(card)}",
-                                sticker_file_id=sticker_id,
-                                input_message_content=InputTextMessageContent(
-                                    message_text=f"/play attack {repr(card)}"
-                                ),
-                            )
+                if card not in playable_cards:
+                    continue
+
+                style = 'trump_normal' if card.suit == game.trump else 'normal'
+                sticker_id = th.get_sticker_id(repr(card), theme_name, style=style)
+                if sticker_id:
+                    # Отправляем только стикер, без текстовой команды в чат.
+                    results.append(
+                        Sticker(
+                            id=f"attack|{repr(card)}",
+                            sticker_file_id=sticker_id,
                         )
+                    )
 
             if player == game.current_player and game.field:
-                 result.add_pass(game, player, results, theme_name)
+                # Атакующий может нажать "Пас"
+                result.add_pass(results, game, theme_name)
             elif player == game.opponent_player and game.field:
-                 result.add_draw(game, player, results, theme_name)
+                # Защищающийся может нажать "Взять"
+                result.add_draw(player, results, theme_name)
 
         elif query.query.startswith('beat_'):
             # Показываем карты для защиты
@@ -71,20 +74,21 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager):
             atk_card = Card.from_repr(atk_card_str)
 
             for def_card in player.cards:
-                if player.can_defend(game, atk_card, def_card):
-                    style = 'trump_normal' if def_card.suit == game.trump else 'normal'
-                    sticker_id = th.get_sticker_id(repr(def_card), theme_name, style=style)
-                    if sticker_id:
-                        results.append(
-                            Sticker(
-                                id=f"defend_{repr(atk_card)}_{repr(def_card)}",
-                                sticker_file_id=sticker_id,
-                                input_message_content=InputTextMessageContent(
-                                    message_text=f"/play defend {repr(atk_card)} {repr(def_card)}"
-                                ),
-                            )
+                # Используем корректную проверку возможности побить карту
+                if not player.can_beat(game, atk_card, def_card):
+                    continue
+
+                style = 'trump_normal' if def_card.suit == game.trump else 'normal'
+                sticker_id = th.get_sticker_id(repr(def_card), theme_name, style=style)
+                if sticker_id:
+                    results.append(
+                        Sticker(
+                            id=f"defend|{repr(atk_card)}|{repr(def_card)}",
+                            sticker_file_id=sticker_id,
                         )
-            result.add_draw(game, player, results, theme_name)
+                    )
+            # Для защищающегося также добавляем возможность "Взять"
+            result.add_draw(player, results, theme_name)
 
     except NoGameInChatError:
         result.add_no_game(results)

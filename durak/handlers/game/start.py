@@ -72,6 +72,7 @@ async def send_game_start_message(bot: Bot, chat_id: int, game: Game):
 
     current = game.current_player
     opponent = game.opponent_player
+    # Информационное сообщение с кликабельными ссылками на игроков (HTML).
     text = (
         f'🎯 <b>Початок раунду</b>\n\n'
         f'⚔️ Атакує: {current.mention} (🃏{len(current.cards)})\n'

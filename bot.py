@@ -74,7 +74,9 @@ async def main():
         logging.critical("Пожалуйста, укажите токен вашего бота в .env файле и перезапустите приложение.")
         sys.exit(1)
 
-    bot = Bot(token=Config.BOT_TOKEN, default=DefaultBotProperties(parse_mode="Markdown"))
+    # Используем HTML как основной режим разметки, т.к. большинство
+    # игровых сообщений и упоминаний (`Player.mention`) формируются в HTML.
+    bot = Bot(token=Config.BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
     storage = RedisStorage.from_url(f"redis://{Config.REDIS_HOST}:{Config.REDIS_PORT}/{Config.REDIS_DB}")
 
     # Создаем єдиний екземпляр GameManager

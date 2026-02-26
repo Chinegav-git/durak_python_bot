@@ -106,6 +106,18 @@ class Card:
         return hash((self.value, self.suit))
 
 
+    @classmethod
+    def from_repr(cls, value: str) -> "Card":
+        """
+        Восстанавливает объект `Card` из внутреннего строкового представления,
+        возвращаемого `__repr__`, например: "14_h".
+        
+        Restores a `Card` instance from its internal string representation
+        returned by `__repr__`, e.g.: "14_h".
+        """
+        # Используем существующую фабричную функцию для единообразного парсинга.
+        return from_str(value)
+
 def from_str(string: str) -> 'Card':
     """
     Фабричная функция для создания карты из ее строкового представления.
