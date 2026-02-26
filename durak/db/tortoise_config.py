@@ -75,3 +75,29 @@ async def close_db_connection():
     Called on application shutdown.
     """
     await Tortoise.close_connections()
+
+
+class DatabaseSession:
+    """
+    Контекстный менеджер для работы с базой данных.
+    Database session context manager.
+    """
+    async def __aenter__(self):
+        # Проверяем, инициализирована ли база данных
+        # Check if database is initialized
+        if not Tortoise._inited:
+            await init_db()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Здесь можно добавить логику очистки транзакций
+        # Add transaction cleanup logic here
+        pass
+
+
+def get_db_session():
+    """
+    Возвращает экземпляр контекстного менеджера для работы с базой данных.
+    Returns database session context manager instance.
+    """
+    return DatabaseSession()

@@ -15,13 +15,15 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from durak.db.models import Chat, ChatSetting
 from durak.filters.is_admin import IsAdminFilter
+from durak.utils.i18n import t
+from durak.utils.language_detector import language_manager
 # ИСПРАВЛЕНО: Теперь используется SettingsCallback для навигации по меню.
 # FIXED: Now using SettingsCallback for menu navigation.
 from .settings_callback import SettingsCallback
 
 router = Router()
 
-async def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.InlineKeyboardMarkup:
+async def get_main_settings_keyboard(chat_id: int, is_admin: bool, user_id: int = None) -> types.InlineKeyboardMarkup:
     """
     Генерирует главное меню настроек в виде inline-клавиатуры.
     
@@ -31,6 +33,7 @@ async def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.Inli
       делегировать обработку соответствующим модулям (game_mode.py, card_theme.py).
     - Весь текст переведен на русский язык для единообразия.
     - Использование pony.orm заменено на асинхронные вызовы Tortoise ORM.
+    - Добавлена кнопка выбора языка.
 
     Generates the main settings menu as an inline keyboard.
 
@@ -40,18 +43,29 @@ async def get_main_settings_keyboard(chat_id: int, is_admin: bool) -> types.Inli
       of handling to the appropriate modules (game_mode.py, card_theme.py).
     - All text has been translated into Russian for consistency.
     - The use of pony.orm has been replaced with asynchronous calls to Tortoise ORM.
+    - Added language selection button.
     """
     builder = InlineKeyboardBuilder()
 
+    # Кнопка для выбора языка
+    if user_id:
+        current_lang = await language_manager.get_user_language(user_id)
+        lang_names = {'uk': 'UA', 'ru': 'RU', 'en': 'EN'}
+        current_lang_name = lang_names.get(current_lang, current_lang.upper())
+        builder.button(
+            text=f"🌐 Мова ({current_lang_name})",
+            callback_data=SettingsCallback(level="language").pack()
+        )
+
     # Кнопка для перехода в меню выбора режима игры
     builder.button(
-        text="✍️ Режим гри",
+        text=t("buttons.game_mode"),
         callback_data=SettingsCallback(level="gamemode").pack()
     )
 
     # Кнопка для перехода в меню выбора темы карт
     builder.button(
-        text="🎨 Тема карт",
+        text=t("buttons.card_theme"),
         callback_data=SettingsCallback(level="card_theme").pack()
     )
 
@@ -81,8 +95,8 @@ async def settings_command_handler(message: types.Message):
     """
     is_admin = await IsAdminFilter(is_admin=True)(message)
     await message.answer(
-        "⚙️ **Настройки**",
-        reply_markup=await get_main_settings_keyboard(message.chat.id, is_admin),
+        t("settings.title"),
+        reply_markup=await get_main_settings_keyboard(message.chat.id, is_admin, message.from_user.id),
     )
 
 
@@ -95,8 +109,8 @@ async def back_to_main_settings_handler(call: types.CallbackQuery):
     """
     is_admin = await IsAdminFilter(is_admin=True)(call)
     await call.message.edit_text(
-        "⚙️ **Настройки**",
-        reply_markup=await get_main_settings_keyboard(call.message.chat.id, is_admin),
+        t("settings.title"),
+        reply_markup=await get_main_settings_keyboard(call.message.chat.id, is_admin, call.from_user.id),
     )
     await call.answer()
 
@@ -122,5 +136,50 @@ async def toggle_sticker_helper_handler(call: types.CallbackQuery):
     # Обновляем клавиатуру, чтобы отразить новое состояние
     # Поскольку этот обработчик доступен только администраторам, мы можем безопасно передать True
     await call.message.edit_reply_markup(
-        reply_markup=await get_main_settings_keyboard(chat_id, True)
+        reply_markup=await get_main_settings_keyboard(chat_id, True, call.from_user.id)
     )
+
+
+@router.callback_query(SettingsCallback.filter(F.level == "language"))
+async def language_settings_handler(call: types.CallbackQuery):
+    """
+    Обработчик для меню выбора языка.
+
+    Handler for language selection menu.
+    """
+    from .language import get_language_keyboard
+    
+    current_language = await language_manager.get_user_language(call.from_user.id)
+    
+    await call.message.edit_text(
+        "🌐 **Мова / Language**\n\n"
+        "Оберіть мову інтерфейсу:\n"
+        "Choose your interface language:",
+        reply_markup=get_language_keyboard(current_language)
+    )
+    await call.answer()
+
+
+@router.callback_query(SettingsCallback.filter(F.level == "set_language"))
+async def set_language_handler(call: types.CallbackQuery, callback_data: SettingsCallback):
+    """
+    Обработчик для установки языка.
+
+    Handler for setting language.
+    """
+    lang_code = callback_data.value
+    
+    # Set user language preference
+    await language_manager.set_user_language(call.from_user.id, lang_code)
+    
+    # Update the message
+    from .language import get_language_keyboard
+    
+    await call.message.edit_text(
+        "🌐 **Мова / Language**\n\n"
+        "Оберіть мову інтерфейсу:\n"
+        "Choose your interface language:",
+        reply_markup=get_language_keyboard(lang_code)
+    )
+    
+    await call.answer("Мову змінено! / Language changed!")

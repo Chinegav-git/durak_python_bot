@@ -13,6 +13,7 @@ from textwrap import dedent
 
 # ИМПОРТ: Команды импортируются из единого источника для консистентности.
 from config import Commands
+from durak.utils.i18n import t
 
 router = Router()
 
@@ -36,26 +37,27 @@ async def help_handler(message: types.Message):
     - The hardcoded /settings command has been replaced with an import from the config.
     """
     # ИСПРАВЛЕНО: Текст переведен на русский и обновлен.
-    help_text = dedent(f"""<b>👋 Вітаю! Я бот для гри в «Дурня».</b>
+    help_text = dedent(f"""<b>{t('help.title')}</b>
 
-<b>Як грати?</b>
-1️⃣ Додайте мене в груповий чат.
-2️⃣ Створіть нову гру командою /{Commands.NEW}.
-3️⃣ Інші гравці можуть приєднатися за допомогою команди /{Commands.JOIN}.
-4️⃣ Коли всі будуть готові (мінімум 2 гравці), творець гри може почати її командою /{Commands.START}.
+{t('help.description')}
+
+{t('help.how_to_start')}
+{t('help.step1')}
+{t('help.step2')}
+{t('help.step3')}
 
 <b>⚙️ Налаштування гри</b>
 Використовуйте команду /{Commands.SETTINGS}, щоб відкрити інтерактивне меню, де ви можете:
 • **Змінити режим гри:** (текст, стікери або змішаний).
 • **Вибрати тему карт:** Налаштуйте зовнішній вигляд карт у чаті.
 
-<b>Основні ігрові команди:</b>
-• /{Commands.NEW} - Створити нову гру.
-• /{Commands.JOIN} - Приєднатися до гри.
-• /{Commands.START} - Почати гру.
-• /{Commands.SETTINGS} - Відкрити меню налаштувань.
-• /{Commands.LEAVE} - Покинути лобі (до початку гри).
-• /{Commands.KICK} - Видалити гравця (для творця гри).
-• /{Commands.KILL} - Примусово завершити гру (для адміністраторів чату).
+{t('help.commands_list')}
+• /{Commands.NEW} - {t('commands.new')}.
+• /{Commands.JOIN} - {t('commands.join')}.
+• /{Commands.START} - {t('commands.start')}.
+• /{Commands.SETTINGS} - {t('commands.settings')}.
+• /{Commands.LEAVE} - {t('commands.leave')}.
+• /{Commands.KICK} - {t('commands.kick')}.
+• /{Commands.KILL} - {t('commands.kill')}.
 """)
     await message.answer(help_text)

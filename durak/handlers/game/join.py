@@ -18,6 +18,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 # FIXED: Import command and configuration constants.
 from config import Commands, Config
 from durak.logic.game_manager import GameManager
+from durak.utils.i18n import t
 # ИСПРАВЛЕНО: Явный импорт исключений вместо wildcard.
 # FIXED: Explicit exception imports instead of wildcard.
 from durak.objects import (
@@ -57,25 +58,25 @@ async def process_join(chat: types.Chat, user: types.User, gm: GameManager, game
         # Сверяем ID игры из callback\'а с ID игры в чате, чтобы убедиться, что кнопка актуальна
         if game_id_from_callback and game.id != int(game_id_from_callback):
             # ИСПРАВЛЕНО: Текст переведен на русский.
-            return "Эта кнопка от другой игры, она больше не актуальна."
+            return t('game.old_button')
     except NoGameInChatError:
         # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
-        return f'🚫 В этом чате нет игры! Создайте ее с помощью команды /{Commands.NEW}'
+        return f'🚫 {t("game.no_game")} {t("game.create_new")} /{Commands.NEW}'
 
     try:
         await gm.join_in_game(game, user)
     # ИСПРАВЛЕНО: Все сообщения об ошибках переведены на русский.
     except GameStartedError:
-        return '🚫 Игра уже началась, присоединиться нельзя!'
+        return t('game.already_started')
     except LobbyClosedError:
-        return '🚫 Лобби закрыто!'
+        return t('game.game_closed')
     except LimitPlayersInGameError:
-        return f'🚫 Достигнут лимит в {Config.MAX_PLAYERS} игроков!'
+        return t('game.game_full', current=Config.MAX_PLAYERS, max=Config.MAX_PLAYERS)
     except AlreadyJoinedInGlobalError:
         # ИСПРАВЛЕНО: Текст переведен и используется константа команды.
-        return f'🚫 Вы уже играете в другом чате! Чтобы выйти, используйте /{Commands.GLEAVE}'
+        return f'🚫 {t("game.already_joined_elsewhere")} /{Commands.GLEAVE}'
     except AlreadyJoinedError:
-        return '🚫 Вы уже в игре!'
+        return t('game.already_joined')
     
     return game  # Возвращаем объект игры в случае успеха
 
@@ -93,7 +94,7 @@ async def join_command_handler(message: types.Message, gm: GameManager):
         await message.answer(result)
     else:
         # ИСПРАВЛЕНО: Текст переведен.
-        await message.answer(f'👋 {message.from_user.first_name} приєднався до гри!')
+        await message.answer(t('game.joined', name=message.from_user.first_name))
         # TODO: После присоединения по команде, хорошо бы обновить сообщение с лобби.
         # Это потребует хранения message_id лобби в объекте игры.
 
@@ -140,15 +141,15 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     # ИСПРАВЛЕНО: Восстановлена кнопка "Закрыть лобби" и расстановка adjust(1, 2)
     builder = InlineKeyboardBuilder()
     builder.button(
-        text='👋 Приєднатися', 
+        text=t('buttons.join'), 
         callback_data=GameCallback(action="join", game_id=str(game.id)).pack()
     )
     builder.button(
-        text='🚀 Почати гру', 
+        text=t('buttons.start_game'), 
         callback_data=GameCallback(action="start", game_id=str(game.id)).pack()
     )
     builder.button(
-        text='🔒 Закрити лобі',
+        text=t('buttons.close_lobby'),
         callback_data=GameCallback(action="close", game_id=str(game.id)).pack()
     )
     builder.adjust(1, 2)
@@ -157,7 +158,7 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
         # ИСПРАВЛЕНО: Текст сообщения лобби переведен на русский.
         await call.message.edit_text(
             f'🎮 Гру створено!\n'
-            f'👤 Створив: {game.creator.first_name}\n\n'
+            f'👤 Створив: {game.players[0].first_name}\n\n'
             f'<b>Гравці:</b>\n{players_list}\n\n'
             f'Використовуйте кнопки нижче для керування грою:',
             reply_markup=builder.as_markup()

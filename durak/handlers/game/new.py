@@ -13,6 +13,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from durak.logic.game_manager import GameManager
 from durak.objects import GameAlreadyInChatError, AlreadyJoinedInGlobalError
+from durak.utils.i18n import t
 
 # ИСПРАВЛЕНО: Импортируем GameCallback из правильного модуля.
 # FIXED: Importing GameCallback from the correct module.
@@ -65,33 +66,33 @@ async def new_game_handler(message: types.Message, gm: GameManager):
         game = await gm.new_game(chat, creator=user)
     except GameAlreadyInChatError:
         # ИСПРАВЛЕНО: Текст переведен на русский.
-        await message.answer('🚫 У цьому чаті вже є гра.')
+        await message.answer(t('game.already_exists'))
         return
     except AlreadyJoinedInGlobalError:
         # ИСПРАВЛЕНО: Текст переведен на русский.
-        await message.answer('🚫 Ви вже знаходитесь в іншій грі.')
+        await message.answer(t('game.already_joined_elsewhere'))
         return
 
     # ИСПРАВЛЕНО: Создание клавиатуры с использованием .pack()
     builder = InlineKeyboardBuilder()
     builder.button(
-        text='👋 Приєднатися',
+        text=t('buttons.join'),
         callback_data=GameCallback(action="join", game_id=str(game.id)).pack()
     )
     builder.button(
-        text='🚀 Почати гру',
+        text=t('buttons.start_game'),
         callback_data=GameCallback(action="start", game_id=str(game.id)).pack()
     )
     builder.button(
-        text='🔒 Закрити лобі',
+        text=t('buttons.close_lobby'),
         callback_data=GameCallback(action="close", game_id=str(game.id)).pack()
     )
     builder.adjust(1, 2)
     
     # ИСПРАВЛЕНО: Текст переведен на русский.
     await message.answer(
-        f'🎮 Гру створено!\n'
-        f'👤 Створив: {user.first_name}\n\n'
-        f'Використовуйте кнопки нижче для керування грою:',
+        f'{t("game.created")}\n'
+        f'{t("game.creator", name=user.first_name)}\n\n'
+        f'{t("game.use_buttons")}',
         reply_markup=builder.as_markup()
     )

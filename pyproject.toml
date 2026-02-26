@@ -4,3 +4,4 @@
 tortoise_orm = "durak.db.tortoise_config.TORTOISE_ORM"
 location = "./migrations"
 src_folder = "./."
+version = "1.8.5"

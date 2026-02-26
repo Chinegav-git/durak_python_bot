@@ -76,9 +76,9 @@ class Config:
     # Number of cards dealt at the start of the game
     COUNT_CARDS_IN_START: int = 6
 
-    # Игровой режим по умолчанию. 'p' - стикеры и кнопки
-    # Default game mode. 'p' - stickers and buttons
-    DEFAULT_GAMEMODE: str = "p"
+    # Игровой режим по умолчанию. 'sticker_and_button' - стикеры и кнопки
+    # Default game mode. 'sticker_and_button' - stickers and buttons
+    DEFAULT_GAMEMODE: str = "sticker_and_button"
 
     # Режим отладки
     # Debug mode
@@ -115,16 +115,17 @@ class Commands:
 
 # Список команд и их описаний для меню в Telegram
 # List of commands and their descriptions for the Telegram menu
+# Note: These will be dynamically translated based on user language
 COMMANDS: List[Tuple[str, str]] = [
-    (Commands.NEW, 'Создать новую игру'),
-    (Commands.JOIN, 'Присоединиться к игре'),
-    (Commands.START, 'Запустить игру'),
-    (Commands.LEAVE, 'Покинуть игру или лобби'),
-    (Commands.GLEAVE, 'Покинуть игру во всех чатах'),
-    (Commands.KICK, 'Выгнать игрока'),
-    (Commands.KILL, 'Завершить игру'),
-    (Commands.HELP, 'Помощь по боту'),
-    (Commands.STATS, 'Ваша статистика'),
-    (Commands.OFF_STATS, 'Выключить статистику'),
-    (Commands.ON_STATS, 'Включить статистику')
+    (Commands.NEW, 'new'),  # Will be translated as t('commands.new')
+    (Commands.JOIN, 'join'),  # Will be translated as t('commands.join')
+    (Commands.START, 'start'),  # Will be translated as t('commands.start')
+    (Commands.LEAVE, 'leave'),  # Will be translated as t('commands.leave')
+    (Commands.GLEAVE, 'gleave'),  # Will be translated as t('commands.gleave')
+    (Commands.KICK, 'kick'),  # Will be translated as t('commands.kick')
+    (Commands.KILL, 'kill'),  # Will be translated as t('commands.kill')
+    (Commands.HELP, 'help'),  # Will be translated as t('commands.help')
+    (Commands.STATS, 'stats'),  # Will be translated as t('commands.stats')
+    (Commands.OFF_STATS, 'off_stats'),  # Will be translated as t('commands.off_stats')
+    (Commands.ON_STATS, 'on_stats')  # Will be translated as t('commands.on_stats')
 ]

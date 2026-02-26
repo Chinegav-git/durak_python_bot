@@ -31,6 +31,7 @@ from durak.objects import (
     NotEnoughPlayersError
 )
 from durak.objects.theme import get_sticker_id
+from durak.utils.i18n import t
 
 # ИСПРАВЛЕНО: Корректный импорт GameCallback
 # FIXED: Correct import of GameCallback
@@ -73,17 +74,15 @@ async def send_game_start_message(bot: Bot, chat_id: int, game: Game):
     opponent = game.opponent_player
     text = (
         f'🎯 <b>Початок раунду</b>\n\n'
-        f'⚔️ Атакує: {current.first_name} (🃏{len(current.cards)})\n'
-        f'🛡️ Захищається: {opponent.first_name} (🃏{len(opponent.cards)})\n\n'
+        f'⚔️ Атакує: {current.mention} (🃏{len(current.cards)})\n'
+        f'🛡️ Захищається: {opponent.mention} (🃏{len(opponent.cards)})\n\n'
         f'🃏 Козир: {game.deck.trump_ico}\n'
         f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
     
     # ИСПРАВЛЕНО: Клавиатура-заглушка заменена на рабочую временную клавиатуру
     builder = InlineKeyboardBuilder()
-    builder.button(text="🃏 Мої карти", callback_data=GameCallback(action="my_cards", game_id=str(game.id)).pack())
-    builder.button(text="✅ Пас", callback_data=GameCallback(action="pass", game_id=str(game.id)).pack())
-    builder.button(text="📥 Взяти", callback_data=GameCallback(action="take", game_id=str(game.id)).pack())
+    builder.button(text=t('buttons.my_cards'), switch_inline_query_current_chat='')
     builder.adjust(1)
     
     await bot.send_message(chat_id, text, reply_markup=builder.as_markup())

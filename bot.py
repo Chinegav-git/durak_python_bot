@@ -18,6 +18,7 @@ from config import Config
 from durak.db.tortoise_config import init_db, close_db_connection
 from durak.handlers import setup as setup_handlers
 from durak.middleware import GameManagerMiddleware
+from durak.middleware.language_middleware import LanguageMiddleware
 from durak.utils import callback_manager
 # ИСПРАВЛЕНО: Импортируем GameManager для создания единого экземпляра.
 # FIXED: Import GameManager to create a single instance.
@@ -89,6 +90,10 @@ async def main():
     # Register middleware to pass gm to handlers
     dp.update.middleware(GameManagerMiddleware(gm))
     dp.callback_query.middleware(GameManagerMiddleware(gm))
+    
+    # Register language middleware
+    dp.update.middleware(LanguageMiddleware())
+    dp.callback_query.middleware(LanguageMiddleware())
 
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)

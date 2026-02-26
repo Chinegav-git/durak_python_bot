@@ -29,7 +29,7 @@ def get_available_themes():
     FIXED: The path to themes has been updated from `decks` to `themes`.
     """
     # ИСПРАВЛЕНО: Путь изменен на корректный
-    themes_path = os.path.join("durak", "objects", "themes")
+    themes_path = os.path.join("durak", "objects", "decks")
     if not os.path.isdir(themes_path):
         return [] # Возвращаем пустой список, если директория не найдена
     

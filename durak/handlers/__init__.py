@@ -33,6 +33,7 @@ def setup(game_manager=None) -> Router:
     )
     from .game import setup as setup_game
     from .info import setup as setup_info
+    from . import inline
 
     # Создание экземпляра главного роутера
     # Create an instance of the main router
@@ -47,6 +48,7 @@ def setup(game_manager=None) -> Router:
     # Include routers from subpackages into the main router
     router_instance.include_router(game_router)
     router_instance.include_router(info_router)
+    router_instance.include_router(inline.router)
 
     # Включение роутеров из отдельных модулей
     # Include routers from individual modules

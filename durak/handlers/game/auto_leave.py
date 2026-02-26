@@ -68,7 +68,7 @@ async def auto_leave_on_chat_leave_handler(message: types.Message, gm: GameManag
     mention = user_left.first_name
 
     try:
-        await actions.do_leave_player(game, player_to_remove)
+        await actions.do_leave_player(game, player_to_remove, gm, message.bot)
         
         # ИСПРАВЛЕНО: Текст переведен на русский.
         await message.answer(

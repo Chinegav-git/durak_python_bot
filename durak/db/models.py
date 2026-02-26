@@ -94,6 +94,10 @@ class UserSetting(models.Model):
     # Whether statistics collection is enabled for this user
     stats_enabled = fields.BooleanField(default=True)
 
+    # Язык пользователя (uk, ru, en)
+    # User language (uk, ru, en)
+    language = fields.CharField(max_length=5, default="uk")
+
     # --- Поля статистики ---
     # --- Statistics Fields ---
     games_played = fields.IntField(default=0)

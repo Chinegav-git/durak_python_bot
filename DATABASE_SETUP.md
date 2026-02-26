@@ -25,6 +25,9 @@ source venv/bin/activate
 
 # Создаем таблицы
 python setup_database.py
+
+# Применяем миграции (для добавления поля языка)
+aerich upgrade
 ```
 
 ### 3. Запуск бота
@@ -109,6 +112,7 @@ BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
 ### Таблица `usersettings`
 - `user` - Ссылка на пользователя (One-to-One, PK)
 - `stats_enabled` - Включена ли статистика
+- `language` - Язык интерфейса пользователя (uk, ru, en)
 - `games_played` - Количество сыгранных игр
 - `wins` - Количество побед
 - `cards_played` - Количество сыгранных карт

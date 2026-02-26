@@ -45,7 +45,7 @@ async def lobby_kick_callback_handler(
     kicked_player_name = player_to_kick.name
 
     try:
-        await actions.do_leave_player(game, player_to_kick)
+        await actions.do_leave_player(game, player_to_kick, gm, query.bot)
     except NotEnoughPlayersError:
         await gm.end_game(game)
         try:

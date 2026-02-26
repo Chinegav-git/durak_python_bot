@@ -47,7 +47,7 @@ async def global_leave_handler(message: types.Message, bot: Bot, gm: GameManager
     chat_title = game.chat_title_or_id()
 
     try:
-        await actions.do_leave_player(game, player)
+        await actions.do_leave_player(game, player, gm, message.bot)
 
         # Notify the user who sent the command
         await message.answer(f'👋 Ви успішно покинули гру в чаті "{chat_title}".')
