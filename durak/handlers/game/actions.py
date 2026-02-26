@@ -12,7 +12,7 @@ IMPORTANT: This file restores the game action logic, fixing errors
 but preserving the original architecture for a future, correct refactoring.
 """
 
-from aiogram import F, Router, types
+from aiogram import F, Router, types, Bot
 
 # ИСПРАВЛЕНО: Убран некорректный импорт из loader.py. GameManager теперь
 # будет получаться через инъекцию зависимостей.
@@ -96,7 +96,7 @@ async def process_sticker_move_handler(message: types.Message, gm: GameManager):
         await message.delete()
 
 
-async def _handle_special_sticker(sticker: types.Sticker, game: Game, user: types.User, gm: GameManager, bot: types.Bot):
+async def _handle_special_sticker(sticker: types.Sticker, game: Game, user: types.User, gm: GameManager, bot: Bot):
     """
     Обрабатывает специальные стикеры (draw, pass).
     """
