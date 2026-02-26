@@ -14,7 +14,7 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from durak.db.models import Chat, ChatSetting
-from durak.filters.is_admin import IsAdminFilter
+from durak.logic import utils
 from durak.utils.i18n import t
 from durak.utils.language_detector import language_manager
 # ИСПРАВЛЕНО: Теперь используется SettingsCallback для навигации по меню.
@@ -93,7 +93,7 @@ async def settings_command_handler(message: types.Message):
     Handler for the /settings command.
     Displays the main settings menu.
     """
-    is_admin = await IsAdminFilter(is_admin=True)(message)
+    is_admin = await utils.user_can_change_settings(message.bot, message.from_user.id, message.chat.id)
     await message.answer(
         t("settings.title"),
         reply_markup=await get_main_settings_keyboard(message.chat.id, is_admin, message.from_user.id),
@@ -107,7 +107,7 @@ async def back_to_main_settings_handler(call: types.CallbackQuery):
 
     Handler for the "Back" button, which returns to the main settings menu.
     """
-    is_admin = await IsAdminFilter(is_admin=True)(call)
+    is_admin = await utils.user_can_change_settings(call.bot, call.from_user.id, call.message.chat.id)
     await call.message.edit_text(
         t("settings.title"),
         reply_markup=await get_main_settings_keyboard(call.message.chat.id, is_admin, call.from_user.id),
@@ -115,13 +115,17 @@ async def back_to_main_settings_handler(call: types.CallbackQuery):
     await call.answer()
 
 
-@router.callback_query(SettingsCallback.filter(F.level == "toggle_sticker_helper"), IsAdminFilter(is_admin=True))
+@router.callback_query(SettingsCallback.filter(F.level == "toggle_sticker_helper"))
 async def toggle_sticker_helper_handler(call: types.CallbackQuery):
     """
     Обработчик для переключения помощника ID стикеров (только для администраторов).
 
     Handler for toggling the sticker ID helper (admins only).
     """
+    if not await utils.user_can_change_settings(call.bot, call.from_user.id, call.message.chat.id):
+        await call.answer(t("errors.not_enough_rights"), show_alert=True)
+        return
+
     chat_id = call.message.chat.id
     
     chat, _ = await Chat.get_or_create(id=chat_id)
