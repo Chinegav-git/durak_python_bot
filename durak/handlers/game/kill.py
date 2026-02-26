@@ -2,7 +2,7 @@ from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.enums import ChatType
 
-from durak.filters.is_admin import IsAdminFilter
+from durak.logic import utils
 from durak.logic.game_manager import GameManager
 from durak.objects import NoGameInChatError
 
@@ -28,8 +28,8 @@ async def kill_game_handler(message: types.Message):
         return
 
     # Permission check: must be creator or chat admin
-    is_admin = await IsAdminFilter(is_admin=True)(message)
-    if not (user.id == game.creator_id or is_admin):
+    can_kill = await utils.user_can_change_settings(message.bot, user.id, chat.id)
+    if not (user.id == game.creator_id or can_kill):
         await message.answer(
             "🚫 Ви не можете завершити гру! "
             "Це може зробити лише творець гри або адміністратор чату."

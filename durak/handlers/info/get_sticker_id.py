@@ -6,7 +6,7 @@ Handler for getting a sticker's ID.
 """
 
 from aiogram import Router, types, F
-from durak.filters.is_admin import IsAdminFilter
+from durak.logic import utils
 from durak.db.models import Chat, ChatSetting
 
 router = Router()
@@ -18,8 +18,8 @@ router = Router()
 @router.message(
     F.sticker,
     F.chat.type.in_({'group', 'supergroup'}),
-    IsAdminFilter(is_admin=True)  # Проверяем, является ли пользователь админом бота
-                                  # Checking if the user is a bot admin
+    lambda message: utils.is_bot_admin(message.from_user.id) # Проверяем, является ли пользователь админом бота
+                                                            # Checking if the user is a bot admin
 )
 async def get_sticker_id(message: types.Message):
     """
