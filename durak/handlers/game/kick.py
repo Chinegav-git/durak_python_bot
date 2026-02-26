@@ -1,9 +1,8 @@
-from aiogram import F, Router, Bot, types
+from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.enums import ChatType
 
-from durak.filters.is_admin import IsAdminFilter
-from durak.logic import actions
+from durak.logic import actions, utils
 from durak.logic.game_manager import GameManager
 from durak.objects import NoGameInChatError, NotEnoughPlayersError
 
@@ -40,8 +39,7 @@ async def kick_in_game_handler(message: types.Message, gm: GameManager):
         await message.reply("🚫 Цей користувач не бере участі в грі.")
         return
         
-    is_admin = await IsAdminFilter()(message)
-    if not (kicker_user.id == game.creator_id or is_admin):
+    if not await utils.user_can_kick(message.bot, kicker_user.id, chat, game):
         await message.reply(
             "🚫 Ви не можете виключати гравців. "
             "Це може зробити тільки творець гри або адміністратор чату."
