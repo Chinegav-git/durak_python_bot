@@ -1,7 +1,9 @@
 # Cекция для настройки инструмента миграций Aerich
+# ИСПРАВЛЕНО: Удален параметр `src_folder`, который мешал aerich корректно находить конфигурацию Tortoise ORM.
 # Section for configuring the Aerich migration tool
+# FIXED: Removed the `src_folder` parameter, which prevented aerich from correctly locating the Tortoise ORM configuration.
+
 [tool.aerich]
 tortoise_orm = "durak.db.tortoise_config.TORTOISE_ORM"
 location = "./migrations"
-src_folder = "./."
 version = "1.8.5"
