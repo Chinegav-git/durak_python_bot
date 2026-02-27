@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Скрипт для программного управления Aerich, обходя его CLI.
-ИСПРАВЛЕНО: Конструктор Command() вызывается без аргументов, чтобы он
-самостоятельно читал конфигурацию из pyproject.toml.
+ИСПРАВЛЕНО: Конструктор Command() вызывается с правильным именованным
+аргументом 'tortoise_config'.
 Script to programmatically control Aerich, bypassing its CLI.
-FIXED: The Command() constructor is called without arguments to allow it
-to read the configuration from pyproject.toml on its own.
+FIXED: The Command() constructor is called with the correct keyword
+argument 'tortoise_config'.
 """
 
 import asyncio
@@ -30,12 +30,9 @@ async def main():
     """
     print("--- Запуск миграции в программном режиме ---")
 
-    # Получаем имя миграции из аргументов командной строки
-    # Get migration name from command line arguments
-    args = sys.argv[1:]
-    # ИСПРАВЛЕНО: Даем миграции осмысленное имя "Initial"
-    # FIXED: Giving the migration a meaningful name "Initial"
-    name = "Initial" if not args else " ".join(args)
+    # Имя для "нулевой" миграции, фиксирующей текущее состояние
+    # Name for the "zero" migration to capture the current state
+    name = "Initial"
 
     print(f"1. Имя миграции: '{name}'")
 
@@ -53,9 +50,9 @@ async def main():
         print(f"   Найденные приложения Tortoise: {list(Tortoise.apps.keys())}")
 
         print("3. Создание объекта команды Aerich...")
-        # ИСПРАВЛЕНО: Вызываем без аргументов, aerich сам найдет pyproject.toml
-        # FIXED: Call without arguments, aerich will find pyproject.toml itself
-        command = Command()
+        # ИСПРАВЛЕНО: Используем правильный аргумент tortoise_config
+        # FIXED: Using the correct tortoise_config argument
+        command = Command(tortoise_config=TORTOISE_ORM)
         print("   ...Успешно.")
 
         print(f"4. Генерация миграции '{name}'...")
