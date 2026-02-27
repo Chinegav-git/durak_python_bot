@@ -127,6 +127,10 @@ class ChatSetting(models.Model):
     # Card theme selected for the chat
     card_theme = fields.CharField(max_length=255, default="classic")
 
+    # Включен ли автопас (автоматический пропуск хода, если нет вариантов)
+    # Whether autopass is enabled (automatic turn skip if no options)
+    autopass_enabled = fields.BooleanField(default=True)
+
     # Включен ли помощник по ID стикеров
     # Whether the sticker ID helper is enabled
     sticker_id_helper = fields.BooleanField(default=False)

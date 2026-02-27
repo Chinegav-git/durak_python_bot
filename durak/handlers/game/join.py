@@ -157,12 +157,12 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
 
     with suppress(TelegramBadRequest):
         # ИСПРАВЛЕНО: Текст сообщения лобби переведен на русский и использует i18n.
-        # ИСПРАВЛЕНО: Отображение создателя игры теперь берется из game.creator, а не game.players[0].
+        # ИСПРАВЛЕНО: Отображение создателя игры теперь берется из game.creator_name.
         # FIXED: Lobby message text is translated into Russian and uses i18n.
-        # FIXED: The display of the game creator is now taken from game.creator, not game.players[0].
+        # FIXED: The display of the game creator is now taken from game.creator_name.
         await call.message.edit_text(
             f'{t("game.created")}\n'
-            f'{t("game.creator", name=game.creator.first_name)}\n\n'
+            f'{t("game.creator", name=game.creator_name)}\n\n'
             f'<b>{t("game.players_list_header")}</b>\n'
             f'{players_list}\n\n'
             f'{t("game.use_buttons")}',

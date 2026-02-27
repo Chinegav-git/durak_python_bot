@@ -39,15 +39,22 @@ def get_available_themes():
         if f.endswith('.py') and not f.startswith('__')
     ])
 
-async def get_card_theme_keyboard(chat_id: int):
+async def get_card_theme_keyboard(chat: types.Chat):
     """
     Генерирует клавиатуру для настроек темы карт.
     Отмечает текущую выбранную тему.
+    
+    ИСПРАВЛЕНО: Теперь принимает объект chat для корректного создания записи в БД.
     Generates the keyboard for card theme settings.
     Marks the currently selected theme.
+    
+    FIXED: Now takes a chat object to correctly create a DB record.
     """
-    chat, _ = await Chat.get_or_create(id=chat_id)
-    cs, _ = await ChatSetting.get_or_create(chat=chat)
+    db_chat, _ = await Chat.get_or_create(
+        id=chat.id, 
+        defaults={'title': chat.title or "Unknown", 'type': chat.type}
+    )
+    cs, _ = await ChatSetting.get_or_create(chat=db_chat)
     current_theme = cs.card_theme
     builder = InlineKeyboardBuilder()
 
@@ -79,11 +86,18 @@ async def set_card_theme(message: types.Message):
     """
     Обработчик команды /cardtheme.
     Сообщает пользователю текущую тему и предлагает использовать /settings для изменения.
+    
+    ИСПРАВЛЕНО: Добавлены обязательные поля при создании чата в БД.
     Handler for the /cardtheme command.
     Informs the user about the current theme and suggests using /settings to change it.
+    
+    FIXED: Mandatory fields added when creating a chat in the DB.
     """
-    chat, _ = await Chat.get_or_create(id=message.chat.id)
-    chat_setting, _ = await ChatSetting.get_or_create(chat=chat)
+    db_chat, _ = await Chat.get_or_create(
+        id=message.chat.id, 
+        defaults={'title': message.chat.title or "Unknown", 'type': message.chat.type}
+    )
+    chat_setting, _ = await ChatSetting.get_or_create(chat=db_chat)
     current_theme = chat_setting.card_theme
 
     await message.answer(
@@ -101,7 +115,7 @@ async def show_card_theme_settings(call: types.CallbackQuery):
     """
     await call.message.edit_text(
         "🎨 **Тема карт**\n\nВыберите внешний вид карт:",
-        reply_markup=await get_card_theme_keyboard(call.message.chat.id)
+        reply_markup=await get_card_theme_keyboard(call.message.chat)
     )
     await call.answer()
 
@@ -111,14 +125,21 @@ async def set_card_theme_callback(call: types.CallbackQuery, callback_data: Sett
     """
     Устанавливает выбранную тему карт из callback'а.
     Обновляет запись в базе данных и изменяет клавиатуру, чтобы отразить выбор.
+    
+    ИСПРАВЛЕНО: Исправлена ошибка валидации при создании чата.
     Sets the chosen card theme from a callback.
     Updates the database record and modifies the keyboard to reflect the choice.
+    
+    FIXED: Fixed validation error during chat creation.
     """
     new_theme = callback_data.value
-    chat_id = call.message.chat.id
+    chat = call.message.chat
 
-    chat, _ = await Chat.get_or_create(id=chat_id)
-    chat_setting, _ = await ChatSetting.get_or_create(chat=chat)
+    db_chat, _ = await Chat.get_or_create(
+        id=chat.id, 
+        defaults={'title': chat.title or "Unknown", 'type': chat.type}
+    )
+    chat_setting, _ = await ChatSetting.get_or_create(chat=db_chat)
     if chat_setting.card_theme != new_theme:
         chat_setting.card_theme = new_theme
         await chat_setting.save()
@@ -127,5 +148,5 @@ async def set_card_theme_callback(call: types.CallbackQuery, callback_data: Sett
         await call.answer("Эта тема уже установлена")
 
     await call.message.edit_reply_markup(
-        reply_markup=await get_card_theme_keyboard(chat_id)
+        reply_markup=await get_card_theme_keyboard(chat)
     )

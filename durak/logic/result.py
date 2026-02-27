@@ -41,9 +41,10 @@ def add_no_game(results: List[InlineQueryResult]):
             id="nogame",
             title="🎮 Вы не играете",
             input_message_content=InputTextMessageContent(
-                '🚫 Вы сейчас не играете. Используйте /new чтобы '
+                message_text='🚫 Вы сейчас не играете. Используйте /new чтобы '
                 'начать игру или /join, чтобы присоединиться к '
-                'текущей игре в этой группе'
+                'текущей игре в этой группе',
+                parse_mode="HTML"
             ),
         )
     )
@@ -59,7 +60,8 @@ def add_not_started(results: List[InlineQueryResult]):
             id="notstarted",
             title="⏳ Игра еще не началась",
             input_message_content=InputTextMessageContent(
-                f'🚀 Начать игру: /{Commands.START}'
+                message_text=f'🚀 Начать игру: /{Commands.START}',
+                parse_mode="HTML"
             ),
         )
     )
@@ -79,7 +81,8 @@ def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme
             id="draw",
             sticker_file_id=sticker_id,
             input_message_content=InputTextMessageContent(
-                f"🎴 {player.mention} взял(а) карты!"
+                message_text=f"🎴 {player.mention} взял(а) карты!",
+                parse_mode="HTML"
             ),
         )
     )
@@ -98,7 +101,10 @@ def add_pass(game: Game, results: List[InlineQueryResult], theme_name: str):
         Sticker(
             id="pass",
             sticker_file_id=sticker_id,
-            input_message_content=InputTextMessageContent('✅ Пас'),
+            input_message_content=InputTextMessageContent(
+                message_text='✅ Пас',
+                parse_mode="HTML"
+            ),
         )
     )
 
@@ -142,7 +148,10 @@ def add_card(
             Sticker(
                 id=id_,
                 sticker_file_id=sticker_id,
-                input_message_content=InputTextMessageContent(message_text),
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                    parse_mode="HTML"
+                ),
             )
         )
     else:

@@ -23,7 +23,7 @@ from .settings_callback import SettingsCallback
 
 router = Router()
 
-async def get_main_settings_keyboard(chat_id: int, is_admin: bool, user_id: int = None) -> types.InlineKeyboardMarkup:
+async def get_main_settings_keyboard(chat: types.Chat, is_admin: bool, user_id: int = None) -> types.InlineKeyboardMarkup:
     """
     Генерирует главное меню настроек в виде inline-клавиатуры.
     
@@ -71,8 +71,11 @@ async def get_main_settings_keyboard(chat_id: int, is_admin: bool, user_id: int 
 
     # Администраторская опция для включения/выключения помощника по ID стикеров
     if is_admin:
-        chat, _ = await Chat.get_or_create(id=chat_id)
-        cs, _ = await ChatSetting.get_or_create(chat=chat)
+        db_chat, _ = await Chat.get_or_create(
+            id=chat.id, 
+            defaults={'title': chat.title or "Unknown", 'type': chat.type}
+        )
+        cs, _ = await ChatSetting.get_or_create(chat=db_chat)
         sticker_helper_status = "✅" if cs.sticker_id_helper else "❌"
         
         builder.button(
@@ -96,7 +99,7 @@ async def settings_command_handler(message: types.Message):
     is_admin = await utils.user_can_change_settings(message.bot, message.from_user.id, message.chat.id)
     await message.answer(
         t("settings.title"),
-        reply_markup=await get_main_settings_keyboard(message.chat.id, is_admin, message.from_user.id),
+        reply_markup=await get_main_settings_keyboard(message.chat, is_admin, message.from_user.id),
     )
 
 
@@ -110,7 +113,7 @@ async def back_to_main_settings_handler(call: types.CallbackQuery):
     is_admin = await utils.user_can_change_settings(call.bot, call.from_user.id, call.message.chat.id)
     await call.message.edit_text(
         t("settings.title"),
-        reply_markup=await get_main_settings_keyboard(call.message.chat.id, is_admin, call.from_user.id),
+        reply_markup=await get_main_settings_keyboard(call.message.chat, is_admin, call.from_user.id),
     )
     await call.answer()
 
@@ -126,10 +129,13 @@ async def toggle_sticker_helper_handler(call: types.CallbackQuery):
         await call.answer(t("errors.not_enough_rights"), show_alert=True)
         return
 
-    chat_id = call.message.chat.id
+    chat = call.message.chat
     
-    chat, _ = await Chat.get_or_create(id=chat_id)
-    cs, _ = await ChatSetting.get_or_create(chat=chat)
+    db_chat, _ = await Chat.get_or_create(
+        id=chat.id,
+        defaults={'title': chat.title or "Unknown", 'type': chat.type}
+    )
+    cs, _ = await ChatSetting.get_or_create(chat=db_chat)
     cs.sticker_id_helper = not cs.sticker_id_helper
     await cs.save()
 
@@ -140,7 +146,7 @@ async def toggle_sticker_helper_handler(call: types.CallbackQuery):
     # Обновляем клавиатуру, чтобы отразить новое состояние
     # Поскольку этот обработчик доступен только администраторам, мы можем безопасно передать True
     await call.message.edit_reply_markup(
-        reply_markup=await get_main_settings_keyboard(chat_id, True, call.from_user.id)
+        reply_markup=await get_main_settings_keyboard(chat, True, call.from_user.id)
     )
 
 

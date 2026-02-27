@@ -15,15 +15,27 @@ from .settings_callback import SettingsCallback # ИСПРАВЛЕНО: Прям
 
 router = Router()
 
-async def get_gamemode_keyboard(chat_id: int):
+async def get_gamemode_keyboard(chat: types.Chat):
     """
     Генерирует клавиатуру для настроек режима игры.
     Отмечает текущий выбранный режим.
+    
+    ИСПРАВЛЕНО:
+    - Сигнатура функции теперь принимает объект `chat` вместо `chat_id`.
+    - Добавлены `defaults` при вызове `Chat.get_or_create` для предотвращения `ValidationError`.
+
     Generates the keyboard for game mode settings.
     Marks the currently selected mode.
+    
+    FIXED:
+    - Function signature now accepts `chat` object instead of `chat_id`.
+    - Added `defaults` in `Chat.get_or_create` call to prevent `ValidationError`.
     """
-    chat, _ = await Chat.get_or_create(id=chat_id)
-    cs, _ = await ChatSetting.get_or_create(chat=chat)
+    db_chat, _ = await Chat.get_or_create(
+        id=chat.id, 
+        defaults={'title': chat.title or "Unknown", 'type': chat.type}
+    )
+    cs, _ = await ChatSetting.get_or_create(chat=db_chat)
     current_mode = cs.game_mode
 
     # Словарь доступных режимов игры
@@ -64,11 +76,21 @@ async def set_game_mode(message: types.Message):
     """
     Обработчик команды /gamemode.
     Сообщает пользователю текущий режим и предлагает использовать /settings для изменения.
+    
+    ИСПРАВЛЕНО:
+    - Добавлены `defaults` при вызове `Chat.get_or_create` для предотвращения `ValidationError`.
+
     Handler for the /gamemode command.
     Informs the user about the current mode and suggests using /settings to change it.
+    
+    FIXED:
+    - Added `defaults` in `Chat.get_or_create` call to prevent `ValidationError`.
     """
-    chat, _ = await Chat.get_or_create(id=message.chat.id)
-    chat_setting, _ = await ChatSetting.get_or_create(chat=chat)
+    db_chat, _ = await Chat.get_or_create(
+        id=message.chat.id, 
+        defaults={'title': message.chat.title or "Unknown", 'type': message.chat.type}
+    )
+    chat_setting, _ = await ChatSetting.get_or_create(chat=db_chat)
     current_mode = chat_setting.game_mode
 
     await message.answer(
@@ -85,8 +107,8 @@ async def show_gamemode_settings(call: types.CallbackQuery):
     Shows the game mode selection menu when the button in settings is pressed.
     """
     await call.message.edit_text(
-        "✍️ **Режим гри**\n\nВиберіть, як будуть відображатися карти та ігровий процес:",
-        reply_markup=await get_gamemode_keyboard(call.message.chat.id)
+        "✍️ **Режим гри**\n\nВиберіть, как будут відображатися карти та ігровый процесс:",
+        reply_markup=await get_gamemode_keyboard(call.message.chat)
     )
     await call.answer()
 
@@ -96,14 +118,26 @@ async def set_gamemode_callback(call: types.CallbackQuery, callback_data: Settin
     """
     Устанавливает выбранный режим игры из callback'а.
     Обновляет запись в БД и изменяет клавиатуру, чтобы отразить выбор.
+    
+    ИСПРАВЛЕНО:
+    - Добавлены `defaults` при вызове `Chat.get_or_create` для предотвращения `ValidationError`.
+    - Вызов `get_gamemode_keyboard` теперь передает объект `chat`.
+
     Sets the chosen game mode from a callback.
     Updates the DB record and modifies the keyboard to reflect the choice.
+    
+    FIXED:
+    - Added `defaults` in `Chat.get_or_create` call to prevent `ValidationError`.
+    - `get_gamemode_keyboard` call now passes `chat` object.
     """
     new_mode = callback_data.value
-    chat_id = call.message.chat.id
+    chat = call.message.chat
 
-    chat, _ = await Chat.get_or_create(id=chat_id)
-    chat_setting, _ = await ChatSetting.get_or_create(chat=chat)
+    db_chat, _ = await Chat.get_or_create(
+        id=chat.id,
+        defaults={'title': chat.title or "Unknown", 'type': chat.type}
+    )
+    chat_setting, _ = await ChatSetting.get_or_create(chat=db_chat)
     if chat_setting.game_mode != new_mode:
         chat_setting.game_mode = new_mode
         await chat_setting.save()
@@ -112,7 +146,7 @@ async def set_gamemode_callback(call: types.CallbackQuery, callback_data: Settin
         # Обновление клавиатуры для отображения нового выбора
         # Update the keyboard to show the new selection
         await call.message.edit_reply_markup(
-            reply_markup=await get_gamemode_keyboard(chat_id)
+            reply_markup=await get_gamemode_keyboard(chat)
         )
     else:
         await call.answer("Цей режим вже встановлено")
