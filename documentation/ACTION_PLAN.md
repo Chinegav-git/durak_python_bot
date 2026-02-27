@@ -14,6 +14,11 @@
 
 ## Критические Риски и Зоны Проверки (Critical Risks and Checkpoints)
 
+- [x] **Система Миграций БД (DB Migration System):**
+    - [x] Отказ от `aerich` из-за конфликтов версий.
+    - [x] Внедрена система ручных миграций через SQL-скрипты.
+    - [x] Создан скрипт `init_db.py` для инициализации пустой БД.
+    - [x] Процесс задокументирован в `documentation/DATABASE_MIGRATIONS.md`.
 - [x] **Сериализация объектов (Serialization):** Реализовать `__getstate__` и `__setstate__` для `Game` и `Player`. Из сериализации исключены объекты aiogram и логгеры.
 - [x] **Игровые действия (Game Actions):** Исправить вызовы `play_attack` и `play_defence` в `actions.py` (удален лишний аргумент `game`).
 - [x] **Менеджер игры (Game Manager):** Добавлено восстановление циклической ссылки `player.game = self` при десериализации в `Game.__setstate__`.
@@ -27,8 +32,8 @@
 
 ## 🛠 Текущие задачи / Current Tasks
 
-### 1. Настройка "Автопас" / "Autopass" Setting (В ОЖИДАНИИ / PENDING)
-- [ ] **Расширение БД:** добавить поле `autopass_enabled` в `ChatSetting` / **DB Expansion:** add `autopass_enabled` field to `ChatSetting`.
+### 1. Настройка "Автопас" / "Autopass" Setting (В процессе / In Progress)
+- [x] **Расширение БД:** Добавлено поле `auto_pass_enabled` в `UserSettings`. / **DB Expansion:** Added `auto_pass_enabled` field to `UserSettings`.
 - [ ] **Обновление UI настроек:** добавить кнопку переключения в главное меню настроек / **UI Update:** add toggle button to the main settings menu.
 - [ ] **Локализация:** добавить строки перевода для новой настройки / **Localization:** add translation strings for the new setting.
 - [ ] **Игровая логика:** автоматический пропуск хода на основе настройки (Правило 14) / **Game Logic:** automatic turn skip based on the setting (Rule 14).
