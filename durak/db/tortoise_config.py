@@ -6,11 +6,17 @@
 Ранее система могла откатываться к SQLite, если переменные окружения были недоступны,
 что приводило к созданию миграций для неверной СУБД.
 
+ИСПРАВЛЕНО: Имена переменных окружения для подключения к БД приведены в соответствие
+с документацией проекта (DB_USER, DB_HOST и т.д. вместо POSTGRES_USER).
+
 Configuration file for Tortoise ORM.
 
 FIXED: The configuration has been explicitly changed to enforce the use of PostgreSQL.
 Previously, the system could fall back to SQLite if environment variables were not available,
 which led to creating migrations for the wrong СУБД.
+
+FIXED: Environment variable names for DB connection have been aligned with the project
+documentation (DB_USER, DB_HOST, etc. instead of POSTGRES_USER).
 """
 
 import os
@@ -18,11 +24,11 @@ from tortoise import Tortoise
 
 # Загружаем переменные окружения для подключения к БД
 # Loading environment variables for DB connection
-DB_USER = os.environ.get("POSTGRES_USER", "chinegav")
-DB_PASS = os.environ.get("POSTGRES_PASSWORD", "90874513067")
-DB_HOST = os.environ.get("POSTGRES_HOST", "127.0.0.1")
-DB_PORT = os.environ.get("POSTGRES_PORT", "5432")
-DB_NAME = os.environ.get("POSTGRES_DB", "durak_db")
+DB_USER = os.environ.get("DB_USER", "chinegav")
+DB_PASS = os.environ.get("DB_PASSWORD", "90874513067")
+DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
+DB_PORT = os.environ.get("DB_PORT", "5432")
+DB_NAME = os.environ.get("DB_NAME", "durak_db")
 
 # Формируем URL для подключения к PostgreSQL
 # Generating the connection URL for PostgreSQL
