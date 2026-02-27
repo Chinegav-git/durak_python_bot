@@ -2,8 +2,11 @@
 """
 Временный скрипт для прямого применения изменений схемы через Tortoise ORM.
 Использует Tortoise.generate_schemas() для добавления недостающих колонок.
+ИСПРАВЛЕНО: Удалена некритичная строка вывода, вызывавшая ошибку.
+
 Temporary script to directly apply schema changes via Tortoise ORM.
 Uses Tortoise.generate_schemas() to add missing columns.
+FIXED: Removed a non-critical output line that was causing an error.
 """
 
 import asyncio
@@ -30,20 +33,14 @@ async def apply_changes():
         await Tortoise.init(config=TORTOISE_ORM)
         print("   ...Успешно.")
 
-        print("2. Соединение с базой данных...")
-        # generate_schemas требует явного получения соединения
-        # generate_schemas requires an explicit connection acquisition
-        conn = Tortoise.get_connection("default")
-        print(f"   ...Успешно. Соединение: {conn.get_dialect()}")
-
-        print("3. Применение изменений схемы (generate_schemas)...")
+        print("2. Применение изменений схемы (generate_schemas)...")
         # safe=True означает, что существующие таблицы не будут удалены
         # safe=True means existing tables will not be dropped
         await Tortoise.generate_schemas(safe=True)
         print("   ...Схема успешно обновлена.")
 
         print("\n--- Изменение БД успешно завершено! ---")
-        print("Колонка 'auto_pass_enabled' должна быть добавлена в таблицу 'usersettings'.")
+        print("Колонка 'auto_pass_enabled' должна была быть добавлена в таблицу 'usersettings'.")
 
     except Exception as e:
         print(f"\nОШИБКА: Не удалось применить изменения - {e}")
