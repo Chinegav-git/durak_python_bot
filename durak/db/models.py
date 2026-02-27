@@ -97,6 +97,10 @@ class UserSetting(models.Model):
     # Язык пользователя (uk, ru, en)
     # User language (uk, ru, en)
     language = fields.CharField(max_length=5, default="uk")
+    
+    # Включен ли "автопас" для этого пользователя
+    # Whether "autopass" is enabled for this user
+    auto_pass_enabled = fields.BooleanField(default=False)
 
     # --- Поля статистики ---
     # --- Statistics Fields ---
