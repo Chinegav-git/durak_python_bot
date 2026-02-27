@@ -329,7 +329,7 @@ async def do_attack_card(game: Game, player: Player, card: Card, gm: GameManager
     Handles an attacking card move.
     """
     try:
-        player.play_attack(game, card)
+        player.play_attack(card)
     except NotAllowedMove as e:
         logger.warning(f"Игрок {player.id} попытался сделать некорректный ход: {e}")
         return
@@ -422,7 +422,7 @@ async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: 
     Handles a defending card move.
     """
     try:
-        player.play_defence(game, atk_card, def_card)
+        player.play_defence(atk_card, def_card)
     except NotAllowedMove as e:
         logger.warning(f"Игрок {player.id} попытался сделать некорректный ход: {e}")
         return

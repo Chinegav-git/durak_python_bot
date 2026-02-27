@@ -11,9 +11,10 @@ import logging
 import typing
 from datetime import datetime
 from time import time
-from typing import List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from aiogram import types
+from aiogram.utils.link import create_tg_link
 
 from config import Config
 from .card import Card
@@ -31,24 +32,50 @@ class Player:
 
     def __init__(self, game: 'Game', user: types.User) -> None:
         self.game = game
-        self.user = user
+        self._user_id = user.id
+        self._first_name = user.first_name
+        self._last_name = user.last_name
+        self._username = user.username
+        
         self.cards: List[Card] = []
         self.finished_game: bool = False
         self.anti_cheat: int = int(time())
         self.turn_started: datetime = datetime.now()
         self.waiting_time: int = Config.WAITING_TIME
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Возвращает состояние объекта для сериализации (pickle), исключая несериализуемые объекты.
+        Returns the object state for serialization (pickle), excluding non-serializable objects.
+        """
+        state = self.__dict__.copy()
+        # Удаляем ссылку на игру, так как она будет сериализована в Game
+        # Remove game reference as it will be serialized in Game
+        if 'game' in state:
+            del state['game']
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]):
+        """
+        Восстанавливает состояние объекта после десериализации.
+        Restores the object state after deserialization.
+        """
+        self.__dict__.update(state)
+        # Поле 'game' должно быть установлено родителем (Game) при десериализации
+        # The 'game' field must be set by the parent (Game) during deserialization
+        self.game = None
+
     @property
     def id(self) -> int:
-        return self.user.id
+        return self._user_id
 
     @property
     def first_name(self) -> str:
-        return self.user.first_name
+        return self._first_name
 
     @property
     def username(self) -> Optional[str]:
-        return self.user.username
+        return self._username
     
     @property
     def mention(self) -> str:
@@ -56,7 +83,11 @@ class Player:
         Возвращает HTML-форматированную строку для упоминания пользователя в Telegram.
         Returns an HTML-formatted string to mention the user in Telegram.
         """
-        return self.user.mention_html(self.user.first_name)
+        name = self._first_name
+        if self._last_name:
+            name += f" {self._last_name}"
+        
+        return f'<a href="{create_tg_link("user", id=self._user_id)}">{name}</a>'
 
     def add_cards(self, cards: List[Card]):
         """

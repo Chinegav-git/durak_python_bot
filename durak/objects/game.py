@@ -13,17 +13,26 @@ from config import Config
 
 
 class Game:
-    """ This is Game """
+    """ 
+    Класс, представляющий игровую сессию.
+    Class representing a game session.
+    """
+    
+    logger = logging.getLogger(__name__)
 
     def __init__(self, chat: types.Chat, creator: types.User) -> None:
         self.id = chat.id
-        self.chat: types.Chat = chat
+        self.chat_title: str = chat.title
+        self.chat_type: str = chat.type
+        
+        self.creator_id: int = creator.id
+        self.creator_name: str = creator.first_name
+        
         self.deck: Deck = Deck()
         self.field: Dict[Card, Optional[Card]] = dict()
         self.trump: c.Suits = None
-        self.players: List[Player] = [Player(self, creator)] # <--- FIX
+        self.players: List[Player] = [Player(self, creator)]
         self.started: bool = False
-        self.creator: types.User = creator
         self.open: bool = True
         self.mode: str = Config.DEFAULT_GAMEMODE
 
@@ -41,7 +50,30 @@ class Game:
 
         self.COUNT_CARDS_IN_START: int = Config.COUNT_CARDS_IN_START
         self.MAX_PLAYERS: int = Config.MAX_PLAYERS
-        self.logger = logging.getLogger(__name__)
+
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Возвращает состояние объекта для сериализации, исключая объекты aiogram и логгер.
+        Returns the object state for serialization, excluding aiogram objects and the logger.
+        """
+        state = self.__dict__.copy()
+        # Удаляем объекты, которые нельзя сериализовать через pickle (aiogram types и logger)
+        # Remove objects that cannot be pickled (aiogram types and logger)
+        state.pop('chat', None)
+        state.pop('creator', None)
+        state.pop('logger', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Восстанавливает состояние объекта после десериализации.
+        Restores the object state after deserialization.
+        """
+        self.__dict__.update(state)
+        # Восстанавливаем ссылку на объект игры для каждого игрока
+        # Restore the game object reference for each player
+        for player in self.players:
+            player.game = self
 
     @property
     def game_is_over(self) -> bool:
@@ -69,7 +101,7 @@ class Game:
         return False
 
     def player_for_id(self, user_id: int) -> Optional[Player]:
-        return next((p for p in self.players if p.user.id == user_id), None)
+        return next((p for p in self.players if p.id == user_id), None)
 
     def start(self):
         self.deck._fill_cards()
@@ -214,7 +246,7 @@ class Game:
                     cards = self.deck.draw_many(needed)
                     player.add_cards(cards)
                 except DeckEmptyError:
-                    self.logger.warning(f"DeckEmptyError for {player.user.id} despite check.")
+                    self.logger.warning(f"DeckEmptyError for {player.id} despite check.")
                     try:
                         cards = self.deck.draw_many(len(self.deck.cards))
                         player.add_cards(cards)

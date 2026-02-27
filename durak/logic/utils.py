@@ -42,18 +42,28 @@ def user_is_bot_admin(user_id: int) -> bool:
 
 async def get_admin_ids(bot: Bot, chat_id: int) -> list[int]:
     """Возвращает список ID администраторов для указанного чата.
+    Если это личный чат (chat_id > 0), возвращает пустой список.
     
     Returns a list of admin IDs for a given chat.
+    If it's a private chat (chat_id > 0), returns an empty list.
     """
+    if chat_id > 0:
+        return []
+        
     chat_admins = await bot.get_chat_administrators(chat_id)
     return [admin.user.id for admin in chat_admins]
 
 
 async def user_is_chat_admin(bot: Bot, user_id: int, chat_id: int) -> bool:
     """Проверяет, является ли пользователь администратором в конкретном чате.
+    В личном чате всегда возвращает True.
     
     Checks if a user is an admin in a specific chat.
+    Always returns True in a private chat.
     """
+    if chat_id > 0:
+        return True
+        
     return user_id in await get_admin_ids(bot, chat_id)
 
 
