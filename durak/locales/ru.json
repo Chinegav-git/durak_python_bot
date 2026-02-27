@@ -16,6 +16,7 @@
   "game": {
     "created": "🎮 Игра создана!",
     "creator": "👤 Создал: {name}",
+    "players_list_header": "Игроки:",
     "use_buttons": "Используйте кнопки ниже для управления игрой:",
     "already_exists": "🚫 В этом чате уже есть игра.",
     "already_joined_elsewhere": "🚫 Вы уже находитесь в другой игре.",
@@ -37,14 +38,25 @@
     "cannot_kick_creator": "🚫 Невозможно выгнать создателя игры!",
     "kicked_player": "👊 {kicker_name} выгнал(а) {kicked_name} из игры!",
     "joined": "👋 {name} присоединился к игре!",
+    "join_success_alert": "👋 {name}, вы присоединились к игре!",
     "already_joined": "🚫 Вы уже присоединились к этой игре!",
     "game_full": "🚫 Игра уже заполнена ({current}/{max} игроков)!",
     "game_closed": "🚫 Лобби закрыто. Нельзя присоединиться.",
     "not_enough_players": "🚫 Недостаточно игроков для начала игры! Нужно минимум 2 игрока.",
-    "cannot_start": "🚫 Только создатель игры может её начать!",
+    "join_suggestion": "Присоединиться:",
+    "start_permission_denied": "🚫 Начать игру может только её создатель или администратор чата.",
     "already_started": "🚫 Игра уже начата!",
+    "started_successfully": "🚀 Игра началась!",
+    "old_button": "Эта кнопка больше не актуальна.",
     "current_mode": "Текущий режим игры: `{mode}`.",
     "change_mode": "Чтобы изменить режим, воспользуйтесь меню /settings."
+  },
+  "round": {
+    "start_header": "Начало раунда",
+    "attacker": "Атакует: {name} (🃏{count})",
+    "defender": "Защищается: {name} (🃏{count})",
+    "trump": "Козырь: {trump_icon}",
+    "deck_cards_count": "В колоде: {count} карт"
   },
   "buttons": {
     "join": "👋 Присоединиться",

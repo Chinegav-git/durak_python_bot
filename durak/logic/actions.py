@@ -233,7 +233,7 @@ async def do_pass(game: Game, player: Player, gm: GameManager, bot: Bot):
     
     # bot должен передаваться как параметр
     # bot = Bot.get_current()  # Этот метод не существует в aiogram 3.x
-    msg = await bot.send_message(game.id, f"Пас! {player.first_name} більше не підкидає в цьому раунді.")
+    msg = await bot.send_message(game.id, f"Пас! {player.first_name} больше не подкидает в этом раунде.")
     if msg:
         asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 7, bot))
 
@@ -335,7 +335,7 @@ async def do_attack_card(game: Game, player: Player, card: Card, gm: GameManager
         return
 
     # Обновляем статистику
-    await _update_attack_stats(player.id)
+    # await _update_attack_stats(player.id)
 
     display_mode, theme_name = await _get_attack_settings(game.id)
 
@@ -427,7 +427,7 @@ async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: 
         logger.warning(f"Игрок {player.id} попытался сделать некорректный ход: {e}")
         return
         
-    await _update_defense_stats(player.id)
+    # await _update_defense_stats(player.id)
 
     # Удаляем сообщения и стикеры, связанные с побитой картой
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)

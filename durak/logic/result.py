@@ -21,8 +21,6 @@ from typing import List
 from uuid import uuid4
 
 from aiogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
     InlineQueryResult,
     InlineQueryResultArticle,
     InlineQueryResultCachedSticker as Sticker,
@@ -36,14 +34,7 @@ from ..objects import Card, Game, Player, theme as th
 def add_no_game(results: List[InlineQueryResult]):
     """
     Добавляет сообщение о том, что пользователь не участвует в игре.
-
-    Args:
-        results: Список, в который добавляется результат.
-
     Adds a message indicating that the user is not participating in a game.
-
-    Args:
-        results: The list to which the result is added.
     """
     results.append(
         InlineQueryResultArticle(
@@ -61,14 +52,7 @@ def add_no_game(results: List[InlineQueryResult]):
 def add_not_started(results: List[InlineQueryResult]):
     """
     Добавляет сообщение о том, что игра еще не началась.
-
-    Args:
-        results: Список, в который добавляется результат.
-
     Adds a message indicating that the game has not yet started.
-
-    Args:
-        results: The list to which the result is added.
     """
     results.append(
         InlineQueryResultArticle(
@@ -84,20 +68,7 @@ def add_not_started(results: List[InlineQueryResult]):
 def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme_name: str):
     """
     Добавляет опцию "Взять карты" в виде стикера.
-
-    Args:
-        game: Текущий объект игры.
-        player: Игрок, для которого генерируется результат.
-        results: Список, в который добавляется результат.
-        theme_name: Название темы карт для выбора правильного стикера.
-
     Adds a "Draw cards" option as a sticker.
-
-    Args:
-        game: The current game object.
-        player: The player for whom the result is being generated.
-        results: The list to which the result is added.
-        theme_name: The name of the card theme to select the correct sticker.
     """
     sticker_id = th.get_sticker_id('draw', theme_name)
     if not sticker_id:
@@ -117,18 +88,7 @@ def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme
 def add_pass(game: Game, results: List[InlineQueryResult], theme_name: str):
     """
     Добавляет опцию "Пас" в виде стикера.
-
-    Args:
-        game: Текущий объект игры.
-        results: Список, в который добавляется результат.
-        theme_name: Название темы карт для выбора правильного стикера.
-
     Adds a "Pass" option as a sticker.
-
-    Args:
-        game: The current game object.
-        results: The list to which the result is added.
-        theme_name: The name of the card theme to select the correct sticker.
     """
     sticker_id = th.get_sticker_id('pass', theme_name)
     if not sticker_id:
@@ -153,38 +113,11 @@ def add_card(
 ):
     """
     Добавляет опцию, представляющую собой игральную карту.
-    
-    Стиль стикера (серый или цветной) зависит от того, может ли игрок
-    походить/побить этой картой. ID результата формируется из строкового
-    представления карты (или карт, в случае защиты).
-
-    Args:
-        game: Текущий объект игры.
-        atk_card: Карта, которую атакуют. Или карта, которой атакуют, если `def_card` is None.
-        results: Список, в который добавляется результат.
-        can_play: Может ли игрок использовать эту карту сейчас.
-        theme_name: Название темы карт.
-        def_card: Карта, которой бьются. Если None, то это атакующая карта.
-
     Adds an option representing a playing card.
-
-    The sticker style (gray or colored) depends on whether the player can
-    attack or defend with this card. The result ID is formed from the string
-    representation of the card(s).
-
-    Args:
-        game: The current game object.
-        atk_card: The card being attacked. Or the attacking card if `def_card` is None.
-        results: The list to which the result is added.
-        can_play: Whether the player can use this card now.
-        theme_name: The name of the card theme.
-        def_card: The defending card. If None, this is an attacking card.
     """
     card_to_show = def_card or atk_card
     is_trump = card_to_show.suit == game.trump
 
-    # Определяем стиль стикера в зависимости от возможности хода
-    # Determine sticker style based on playability
     style = 'grey'
     if can_play:
         style = 'trump_normal' if is_trump else 'normal'
@@ -195,14 +128,15 @@ def add_card(
     if not sticker_id:
         return
 
-    # ID должен быть уникальным для каждой комбинации атаки/защиты
-    # ID must be unique for each attack/defense combination
     id_ = repr(atk_card)
     if def_card:
         id_ += f'-{repr(def_card)}'
 
     if can_play:
-        message_text = f"Карта: {str(def_card if def_card else atk_card)}"
+        if def_card:
+            message_text = f"🛡️ Побито карту {str(atk_card)} картой {str(def_card)}"
+        else:
+            message_text = f"⚔️ Подкинуто карту: {str(atk_card)}"
 
         results.append(
             Sticker(
@@ -212,13 +146,11 @@ def add_card(
             )
         )
     else:
-        # Если картой ходить нельзя, показываем ее серой и без возможности выбора
-        # If the card cannot be played, show it as grayed out and unselectable
         results.append(
             Sticker(
-                id=str(uuid4()), # Уникальный ID, чтобы избежать коллизий
+                id=str(uuid4()),  # Уникальный ID, чтобы избежать коллизий
                 sticker_file_id=sticker_id,
-                input_message_content=game_info(game) # Показываем общую инфу
+                input_message_content=game_info(game)  # Показываем общую инфу
             )
         )
 
@@ -226,25 +158,12 @@ def add_card(
 def game_info(game: Game) -> InputTextMessageContent:
     """
     Формирует подробную информацию о текущем состоянии игры.
-
-    Args:
-        game: Текущий объект игры.
-
-    Returns:
-        Объект `InputTextMessageContent` с отформатированным текстом.
-
     Generates detailed information about the current game state.
-
-    Args:
-        game: The current game object.
-
-    Returns:
-        An `InputTextMessageContent` object with formatted text.
     """
     players_info = ''.join(f"\n👤 {len(pl.cards)} 🃏 | {pl.mention}" for pl in game.players)
     
     field_info = ''.join(
-        f'\n  `{str(a)}` ◄- `{str(d) if d else "-"}`' 
+        f'\n  `{str(a)}` ◄- `{str(d) if d else "❌"}`'
         for a, d in game.field.items()
     )
 
@@ -265,18 +184,7 @@ def game_info(game: Game) -> InputTextMessageContent:
 def add_gameinfo(game: Game, results: List[InlineQueryResult], theme_name: str):
     """
     Добавляет опцию для отображения информации об игре.
-
-    Args:
-        game: Текущий объект игры.
-        results: Список, в который добавляется результат.
-        theme_name: Название темы карт для выбора правильного стикера.
-
     Adds an option to display game information.
-
-    Args:
-        game: The current game object.
-        results: The list to which the result is added.
-        theme_name: The name of the card theme for the correct sticker.
     """
     sticker_id = th.get_sticker_id('info', theme_name)
     if not sticker_id:

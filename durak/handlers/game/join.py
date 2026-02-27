@@ -129,8 +129,9 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
         return
 
     game = result
-    # ИСПРАВЛЕНО: Текст переведен.
-    await call.answer(f'👋 {call.from_user.first_name}, ви приєдналися до гри!', show_alert=False)
+    # ИСПРАВЛЕНО: Текст переведен и приведен к стандарту i18n.
+    # FIXED: The text has been translated and brought to the i18n standard.
+    await call.answer(t('game.join_success_alert', name=call.from_user.first_name), show_alert=False)
     
     players_list = '\n'.join([
         f'{i + 1}. {player.first_name}'
@@ -155,11 +156,15 @@ async def join_callback_handler(call: types.CallbackQuery, callback_data: GameCa
     builder.adjust(1, 2)
 
     with suppress(TelegramBadRequest):
-        # ИСПРАВЛЕНО: Текст сообщения лобби переведен на русский.
+        # ИСПРАВЛЕНО: Текст сообщения лобби переведен на русский и использует i18n.
+        # ИСПРАВЛЕНО: Отображение создателя игры теперь берется из game.creator, а не game.players[0].
+        # FIXED: Lobby message text is translated into Russian and uses i18n.
+        # FIXED: The display of the game creator is now taken from game.creator, not game.players[0].
         await call.message.edit_text(
-            f'🎮 Гру створено!\n'
-            f'👤 Створив: {game.players[0].first_name}\n\n'
-            f'<b>Гравці:</b>\n{players_list}\n\n'
-            f'Використовуйте кнопки нижче для керування грою:',
+            f'{t("game.created")}\n'
+            f'{t("game.creator", name=game.creator.first_name)}\n\n'
+            f'<b>{t("game.players_list_header")}</b>\n'
+            f'{players_list}\n\n'
+            f'{t("game.use_buttons")}',
             reply_markup=builder.as_markup()
         )

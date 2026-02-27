@@ -16,6 +16,7 @@
   "game": {
     "created": "🎮 Game created!",
     "creator": "👤 Created by: {name}",
+    "players_list_header": "Players:",
     "use_buttons": "Use the buttons below to control the game:",
     "already_exists": "🚫 There is already a game in this chat.",
     "already_joined_elsewhere": "🚫 You are already in another game.",
@@ -37,14 +38,25 @@
     "cannot_kick_creator": "🚫 Cannot kick the game creator!",
     "kicked_player": "👊 {kicker_name} kicked {kicked_name} from the game!",
     "joined": "👋 {name} joined the game!",
+    "join_success_alert": "👋 {name}, you have joined the game!",
     "already_joined": "🚫 You have already joined this game!",
     "game_full": "🚫 Game is already full ({current}/{max} players)!",
     "game_closed": "🚫 Lobby is closed. Cannot join.",
     "not_enough_players": "🚫 Not enough players to start the game! Minimum 2 players required.",
-    "cannot_start": "🚫 Only the game creator can start it!",
+    "join_suggestion": "Join now:",
+    "start_permission_denied": "🚫 Only the game creator or a chat admin can start the game.",
     "already_started": "🚫 Game has already started!",
+    "started_successfully": "🚀 Game has started!",
+    "old_button": "This button is no longer relevant.",
     "current_mode": "Current game mode: `{mode}`.",
     "change_mode": "To change the mode, use the /settings menu."
+  },
+  "round": {
+    "start_header": "Round Start",
+    "attacker": "Attacker: {name} (🃏{count})",
+    "defender": "Defender: {name} (🃏{count})",
+    "trump": "Trump: {trump_icon}",
+    "deck_cards_count": "Cards in deck: {count}"
   },
   "buttons": {
     "join": "👋 Join",

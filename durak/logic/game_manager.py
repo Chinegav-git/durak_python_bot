@@ -18,10 +18,6 @@
 - **Взаимодействие с БД:** Обновляет флаг `is_game_active` в модели `ChatSetting`,
   чтобы отразить наличие активной игры в чате.
 
-ИСПРАВЛЕНИЕ: Вся логика, связанная с устаревшей моделью `UserSetting` (подсчет
-статистики, флаг `is_playing`), была полностью удалена, чтобы восстановить
-работоспособность бота. Эти функции были нерабочими и приводили к падению.
-
 -------------------------------------------------------------------------------------
 
 Game Session Manager (GameManager).
@@ -41,10 +37,6 @@ Key Responsibilities:
   in one chat or a single user participating in multiple games.
 - **DB Interaction:** Updates the `is_game_active` flag in the `ChatSetting` model
   to reflect the presence of an active game in a chat.
-
-FIX: All logic related to the obsolete `UserSetting` model (statistics counting,
-`is_playing` flag) has been completely removed to restore the bot's functionality.
-These features were non-operational and caused crashes.
 """
 
 import pickle
@@ -155,11 +147,8 @@ class GameManager:
 
     async def get_game_by_user_id(self, user_id: int) -> Game:
         """
-        ДОБАВЛЕНО (стабилизация): Находит игру по ID пользователя.
-        Используется для обработчиков, где нет информации о чате (например, inline-режим).
-
-        ADDED (stabilization): Finds a game by user ID.
-        Used for handlers where there is no chat information (e.g., inline mode).
+        Находит игру по ID пользователя.
+        Finds a game by user ID.
         """
         chat_id = await self.get_user_game_id(user_id)
         if not chat_id:
@@ -168,12 +157,8 @@ class GameManager:
         try:
             return await self.get_game_from_chat(chat_id)
         except NoGameInChatError:
-            # Эта ситуация может возникнуть, если блокировка пользователя в Redis
-            # осталась, а сама игра была удалена. Очищаем мусор.
-            # This can happen if a user's lock in Redis remains, but the game itself
-            # was deleted. Cleaning up the garbage.
             await self.redis.delete(self._user_game_key(user_id))
-            raise GameNotFoundError(f"Game in chat {chat_id} not found, but a stale user lock for {user_id} was found and cleared")
+            raise GameNotFoundError(f"Game in chat {chat_id} not found, stale user lock cleared")
 
     def get_game_end_message(self, game: Game) -> str:
         """Генерирует финальное сообщение по окончании игры.
@@ -197,10 +182,6 @@ class GameManager:
     async def new_game(self, chat: types.Chat, creator: types.User) -> Game:
         """Создает новую игру в чате.
         
-        Raises:
-            GameAlreadyInChatError: Если игра в этом чате уже существует.
-            AlreadyJoinedInGlobalError: Если создатель уже участвует в другой игре.
-        
         Creates a new game in a chat.
         """
         if await self.redis.exists(self._game_key(chat.id)):
@@ -208,8 +189,6 @@ class GameManager:
         if await self.get_user_game_id(creator.id):
             raise AlreadyJoinedInGlobalError
 
-        # Убедимся, что чат и создатель существуют в БД
-        # Ensure the chat and creator exist in the DB
         await Chat.get_or_create(id=chat.id, defaults={'title': chat.title, 'type': chat.type})
         await User.get_or_create(
             id=creator.id, 
@@ -220,27 +199,19 @@ class GameManager:
             }
         )
 
-        # Устанавливаем флаг в БД и блокировку в Redis
-        chat, _ = await Chat.get_or_create(id=chat.id)
-        cs, _ = await ChatSetting.get_or_create(chat=chat)
+        cs, _ = await ChatSetting.get_or_create(chat_id=chat.id)
         cs.is_game_active = True
         await cs.save()
         await self.redis.set(self._user_game_key(creator.id), chat.id)
         
-        game = Game(
-            chat_id=chat.id, chat_type=chat.type, creator_id=creator.id,
-            creator_first_name=creator.first_name, creator_username=creator.username
-        )
+        # ИЗМЕНЕНО: Используем новый конструктор, соответствующий эталонной логике.
+        # CHANGED: Using the new constructor that matches the reference logic.
+        game = Game(chat, creator)
         await self.save_game(game)
         return game
 
     async def get_game_from_chat(self, chat_or_id: Union[types.Chat, int]) -> Game:
-        """Получает игру из чата. 
-        
-        Если данные игры повреждены, удаляет их из Redis.
-
-        Raises:
-            NoGameInChatError: Если игра в чате не найдена или данные повреждены.
+        """Получает игру из чата.
         
         Retrieves a game from a chat.
         """
@@ -252,29 +223,24 @@ class GameManager:
         try:
             return await self._deserialize_game(serialized_game)
         except (pickle.UnpicklingError, AttributeError, EOFError, ImportError) as e:
-            # Если данные повреждены, удаляем их, чтобы не вызывать ошибок в будущем
             await self.redis.delete(self._game_key(chat_id))
             raise NoGameInChatError(f"Corrupted game data, deleted: {e}")
 
     async def end_game(self, target: Union[types.Chat, Game]) -> None:
-        """Завершает игру, удаляя все связанные данные из Redis и БД.
+        """Завершает игру, удаляя все связанные данные.
         
-        Ends a game, deleting all related data from Redis and the DB.
+        Ends a game, deleting all related data.
         """
         chat_id = target.id if isinstance(target, Game) else target.id
         game = target if isinstance(target, Game) else await self.get_game_from_chat(chat_id)
         
-        # Снимаем флаг в БД
         cs = await ChatSetting.get_or_none(chat_id=chat_id)
         if cs and cs.is_game_active:
             cs.is_game_active = False
             await cs.save()
 
-        # Обновляем статистику до удаления данных
-        # Update statistics before deleting data
         await self._update_stats_on_game_end(game)
 
-        # Удаляем блокировки пользователей и сам объект игры из Redis
         player_ids = [p.id for p in game.players]
         if player_ids:
             user_keys = [self._user_game_key(pid) for pid in player_ids]
@@ -283,44 +249,32 @@ class GameManager:
         await self.redis.delete(self._game_key(chat_id))
 
     async def leave_game(self, game: Game, player: Player):
-        """Удаляет игрока из игры и очищает его состояние.
+        """Удаляет игрока из игры.
         
-        Raises:
-            NotEnoughPlayersError: Если после выхода остается менее 2 игроков.
-        
-        Removes a player from a game and cleans up their state.
+        Removes a player from a game.
         """
         if player not in game.players:
             return
 
         game.players.remove(player)
-        
-        # Снимаем блокировку с пользователя в Redis
         await self.redis.delete(self._user_game_key(player.id))
 
-        # Если игра еще не началась, просто сохраняем новый список игроков
         if not game.started:
             await self.save_game(game)
             return
 
-        # Если игра уже идет, обрабатываем выход
-        player.leave(game)
+        # ИЗМЕНЕНО: В новой версии Player.leave() не принимает аргументов.
+        # CHANGED: In the new version, Player.leave() takes no arguments.
+        player.leave()
         player.finished_game = True
 
         if len([p for p in game.players if not p.finished_game]) < 2:
-            raise NotEnoughPlayersError("Недостаточно игроков для продолжения")
+            raise NotEnoughPlayersError("Not enough players to continue")
         
         await self.save_game(game)
 
     async def join_in_game(self, game: Game, user: types.User) -> None:
         """Добавляет пользователя в игру.
-        
-        Raises:
-            GameStartedError: Если игра уже началась.
-            LobbyClosedError: Если лобби закрыто.
-            LimitPlayersInGameError: Если достигнут лимит игроков.
-            AlreadyJoinedError: Если пользователь уже в этой игре.
-            AlreadyJoinedInGlobalError: Если пользователь уже в другой игре.
 
         Adds a user to a game.
         """
@@ -335,8 +289,6 @@ class GameManager:
         if await self.get_user_game_id(user.id):
             raise AlreadyJoinedInGlobalError
 
-        # Убедимся, что игрок существует в БД
-        # Ensure the player exists in the DB
         await User.get_or_create(
             id=user.id, 
             defaults={
@@ -346,20 +298,17 @@ class GameManager:
             }
         )
 
-        # Устанавливаем блокировку в Redis
         await self.redis.set(self._user_game_key(user.id), game.id)
 
-        player = Player(user_id=user.id, first_name=user.first_name, username=user.username)
+        # ИЗМЕНЕНО: Используем новый конструктор, соответствующий эталонной логике.
+        # CHANGED: Using the new constructor that matches the reference logic.
+        player = Player(game, user)
         game.players.append(player)
         await self.save_game(game)
 
     async def start_game(self, game: Game) -> None:
         """Начинает игру.
         
-        Raises:
-            GameStartedError: Если игра уже была начата.
-            NotEnoughPlayersError: Если в игре менее 2 игроков.
-
         Starts a game.
         """
         if game.started:
@@ -369,30 +318,3 @@ class GameManager:
 
         game.start()
         await self.save_game(game)
-
-    # Тестовый метод для отладки, его можно будет удалить в будущем
-    # Test method for debugging, can be removed in the future
-    async def test_win_game(self, game: Game, winner_id: int):
-        if not self.bot:
-            return
-
-        winner = game.player_for_id(winner_id)
-        if not winner:
-            raise ValueError("Игрока с таким ID не найдено в этой игре.")
-
-        game.started = False # Останавливаем игру
-        game.winner = winner
-        
-        losers = [p for p in game.players if p.id != winner_id]
-
-        message_parts = ["По команде администратора, игра принудительно завершена!\n"]
-        message_parts.append("🏆 Победитель:")
-        message_parts.append(f'- <a href="tg://user?id={winner.id}">{winner.first_name}</a>')
-        
-        if losers:
-            message_parts.append("\nПроигравшие:")
-            message_parts.extend([f'- <a href="tg://user?id={loser.id}">{loser.first_name}</a>' for loser in losers])
-
-        message = "\n".join(message_parts)
-        await self.bot.send_message(game.id, message)
-        await self.end_game(game)

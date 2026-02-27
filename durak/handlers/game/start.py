@@ -72,13 +72,15 @@ async def send_game_start_message(bot: Bot, chat_id: int, game: Game):
 
     current = game.current_player
     opponent = game.opponent_player
-    # Информационное сообщение с кликабельными ссылками на игроков (HTML).
+    
+    # ИСПРАВЛЕНО: Все строки переведены и используют i18n.
+    # FIXED: All strings are translated and use i18n.
     text = (
-        f'🎯 <b>Початок раунду</b>\n\n'
-        f'⚔️ Атакує: {current.mention} (🃏{len(current.cards)})\n'
-        f'🛡️ Захищається: {opponent.mention} (🃏{len(opponent.cards)})\n\n'
-        f'🃏 Козир: {game.deck.trump_ico}\n'
-        f'🃏 В колоді: {len(game.deck.cards)} карт'
+        f"🎯 <b>{t('round.start_header')}</b>\n\n"
+        f"⚔️ {t('round.attacker', name=current.mention, count=len(current.cards))}\n"
+        f"🛡️ {t('round.defender', name=opponent.mention, count=len(opponent.cards))}\n\n"
+        f"🃏 {t('round.trump', trump_icon=game.deck.trump_ico)}\n"
+        f"🃏 {t('round.deck_cards_count', count=len(game.deck.cards))}"
     )
     
     # ИСПРАВЛЕНО: Клавиатура-заглушка заменена на рабочую временную клавиатуру
@@ -116,19 +118,19 @@ async def process_start(bot: Bot, chat: types.Chat, user: types.User, gm: GameMa
     try:
         game = await gm.get_game_from_chat(chat)
         if game_id_from_callback and game.id != int(game_id_from_callback):
-            return "Эта кнопка больше не актуальна."
+            return t('game.old_button')
     except NoGameInChatError:
-        return f'🚫 В этом чате нет игры! Создайте ее: /{Commands.NEW}'
+        return f'🚫 {t("game.no_game")} {t("game.create_new")} /{Commands.NEW}'
     
     if not (await user_is_creator_or_admin(bot, user.id, game, chat.id)):
-        return '🚫 Начать игру может только её создатель или администратор чата.'
+        return t('game.start_permission_denied')
 
     try:
         await gm.start_game(game)
     except GameStartedError:
-        return '🚫 Игра уже запущена!'
+        return t('game.already_started')
     except NotEnoughPlayersError:
-        return f'🚫 Недостаточно игроков! Присоединиться: /{Commands.JOIN}'
+        return f'🚫 {t("game.not_enough_players")} {t("game.join_suggestion")} /{Commands.JOIN}'
     
     return game
 
@@ -145,7 +147,7 @@ async def start_command_handler(message: types.Message, bot: Bot, gm: GameManage
         await message.answer(result)
     else:
         game = result
-        await message.answer('🚀 Игра началась!')
+        await message.answer(t('game.started_successfully'))
         await send_game_start_message(bot, message.chat.id, game)
 
 
@@ -162,7 +164,7 @@ async def start_callback_handler(call: types.CallbackQuery, callback_data: GameC
         return
 
     game = result
-    await call.answer('🚀 Игра началась!', show_alert=False)
+    await call.answer(t('game.started_successfully'), show_alert=False)
     
     # Удаляем сообщение с лобби, так как игра началась
     with suppress(TelegramBadRequest):
