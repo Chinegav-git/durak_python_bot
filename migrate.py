@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Скрипт для программного управления Aerich, обходя его CLI.
-ИСПРАВЛЕНО: Конструктор Command() вызывается с правильным именованным
-аргументом 'tortoise_config'.
+ИСПРАВЛЕНО: Добавлена отладочная информация для анализа объекта Tortoise.apps
 Script to programmatically control Aerich, bypassing its CLI.
-FIXED: The Command() constructor is called with the correct keyword
-argument 'tortoise_config'.
+FIXED: Added debug information to analyze the Tortoise.apps object.
 """
 
 import asyncio
@@ -30,10 +28,7 @@ async def main():
     """
     print("--- Запуск миграции в программном режиме ---")
 
-    # Имя для "нулевой" миграции, фиксирующей текущее состояние
-    # Name for the "zero" migration to capture the current state
     name = "Initial"
-
     print(f"1. Имя миграции: '{name}'")
 
     try:
@@ -43,15 +38,18 @@ async def main():
         )
         print("   ...Успешно.")
 
-        if not Tortoise.apps:
-            print("   ОШИБКА: Tortoise.apps не был инициализирован!")
-            return
-        
-        print(f"   Найденные приложения Tortoise: {list(Tortoise.apps.keys())}")
+        print("\n--- ОТЛАДКА ---")
+        print(f"   Тип Tortoise.apps: {type(Tortoise.apps)}")
+        print(f"   Атрибуты Tortoise.apps: {dir(Tortoise.apps)}")
+        print("--- КОНЕЦ ОТЛАДКИ ---\n")
 
-        print("3. Создание объекта команды Aerich...")
-        # ИСПРАВЛЕНО: Используем правильный аргумент tortoise_config
-        # FIXED: Using the correct tortoise_config argument
+        # Эта строка теперь тоже часть отладки. Если она вызовет ошибку,
+        # мы будем знать, что у объекта нет даже метода .keys()
+        # This line is now also part of debugging. If it errors out,
+        # we'll know the object doesn't even have a .keys() method.
+        print(f"   Найденные приложения Tortoise (по ключам): {list(Tortoise.apps.keys())}")
+
+        print("\n3. Создание объекта команды Aerich...")
         command = Command(tortoise_config=TORTOISE_ORM)
         print("   ...Успешно.")
 
