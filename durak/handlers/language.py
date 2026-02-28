@@ -1,20 +1,34 @@
 # -*- coding: utf-8 -*-
 """
-Language selection handlers.
-Обробники вибору мови.
+Модуль для генерации клавиатуры выбора языка.
+Module for generating the language selection keyboard.
 """
 
-from aiogram import types, F
-from aiogram.filters import Command
+from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from durak.utils.i18n import t, set_language, i18n
-from durak.utils.language_detector import language_manager
+from durak.utils.i18n import t, i18n
 from durak.handlers.settings_callback import SettingsCallback
 
 
 def get_language_keyboard(current_language: str) -> types.InlineKeyboardMarkup:
-    """Create language selection keyboard."""
+    """
+    Создает клавиатуру для выбора языка.
+    
+    ИСПРАВЛЕНО:
+    - Удалены все обработчики команд и callback-ов, так как эта логика
+      теперь централизована в durak/handlers/settings.py.
+    - Модуль теперь отвечает только за отрисовку клавиатуры.
+    - Исправлен некорректный текст в `call.answer` (логика удалена).
+    
+    Creates the language selection keyboard.
+    
+    FIXED:
+    - Removed all command and callback handlers, as this logic is now
+      centralized in durak/handlers/settings.py.
+    - The module is now responsible only for rendering the keyboard.
+    - Corrected incorrect text in `call.answer` (logic removed).
+    """
     builder = InlineKeyboardBuilder()
     
     languages = i18n.get_available_languages()
@@ -29,6 +43,7 @@ def get_language_keyboard(current_language: str) -> types.InlineKeyboardMarkup:
     
     builder.adjust(1)
     
+    # Кнопка "Назад"
     # Back button
     builder.button(
         text=t("buttons.back"),
@@ -37,36 +52,3 @@ def get_language_keyboard(current_language: str) -> types.InlineKeyboardMarkup:
     builder.adjust(1)
     
     return builder.as_markup()
-
-
-async def handle_language_command(message: types.Message):
-    """Handle /language command."""
-    # Get current user language
-    current_language = await language_manager.get_or_detect_language(message.from_user)
-    set_language(current_language)
-    
-    await message.answer(
-        "🌐 **Мова / Language**\n\n"
-        "Оберіть мову інтерфейсу:\n"
-        "Choose your interface language:",
-        reply_markup=get_language_keyboard(current_language)
-    )
-
-
-async def handle_language_callback(call: types.CallbackQuery, callback_data: SettingsCallback):
-    """Handle language selection callback."""
-    lang_code = callback_data.value
-    
-    # Set user language preference
-    await language_manager.set_user_language(call.from_user.id, lang_code)
-    set_language(lang_code)
-    
-    # Update the message
-    await call.message.edit_text(
-        "🌐 **Мова / Language**\n\n"
-        "Оберіть мову інтерфейсу:\n"
-        "Choose your interface language:",
-        reply_markup=get_language_keyboard(lang_code)
-    )
-    
-    await call.answer(t("settings.theme_already_set"))

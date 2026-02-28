@@ -32,11 +32,11 @@
 
 ## 🛠 Текущие задачи / Current Tasks
 
-### 1. Настройка "Автопас" / "Autopass" Setting (В процессе / In Progress)
+### 1. Настройка "Автопас" / "Autopass" Setting (✅ Завершено / Completed)
 - [x] **Расширение БД:** Добавлено поле `auto_pass_enabled` в `UserSettings`. / **DB Expansion:** Added `auto_pass_enabled` field to `UserSettings`.
-- [ ] **Обновление UI настроек:** добавить кнопку переключения в главное меню настроек / **UI Update:** add toggle button to the main settings menu.
-- [ ] **Локализация:** добавить строки перевода для новой настройки / **Localization:** add translation strings for the new setting.
-- [ ] **Игровая логика:** автоматический пропуск хода на основе настройки (Правило 14) / **Game Logic:** automatic turn skip based on the setting (Rule 14).
+- [x] **Обновление UI настроек:** Добавлена кнопка переключения в меню настроек. / **UI Update:** Added toggle button to the settings menu.
+- [x] **Локализация:** Добавлены строки перевода для новой настройки. / **Localization:** Added translation strings for the new setting.
+- [x] **Игровая логика:** Автоматический пропуск хода на основе настройки реализован в `durak/logic/actions.py`. / **Game Logic:** Automatic turn skip based on the setting is implemented in `durak/logic/actions.py`.
 
 ---
 

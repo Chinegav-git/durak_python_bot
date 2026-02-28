@@ -15,7 +15,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from durak.db.models import Chat, ChatSetting
 from durak.logic import utils
-from durak.utils.i18n import t
+from durak.utils.i18n import t, set_language # ИСПРАВЛЕНО: Добавлен импорт set_language
 from durak.utils.language_detector import language_manager
 # ИСПРАВЛЕНО: Теперь используется SettingsCallback для навигации по меню.
 # FIXED: Now using SettingsCallback for menu navigation.
@@ -181,6 +181,7 @@ async def set_language_handler(call: types.CallbackQuery, callback_data: Setting
     
     # Set user language preference
     await language_manager.set_user_language(call.from_user.id, lang_code)
+    set_language(lang_code) # ИСПРАВЛЕНО: Устанавливаем язык для i18n
     
     # Update the message
     from .language import get_language_keyboard
@@ -192,4 +193,4 @@ async def set_language_handler(call: types.CallbackQuery, callback_data: Setting
         reply_markup=get_language_keyboard(lang_code)
     )
     
-    await call.answer("Мову змінено! / Language changed!")
+    await call.answer(t("language_changed")) # ИСПРАВЛЕНО: Используем ключ локализации

@@ -39,7 +39,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 # FIXED (refactoring): Removed `CHOISE` and `gm` import from the deprecated `loader` module.
 # # Global GameManager <-- Old comment saved for history.
 # The GameManager dependency is now injected via function arguments.
-from ..db.models import Chat, ChatSetting, UserSetting # ИСПРАВЛЕНО: Убран неиспользуемый UserSetting
+# ИСПРАВЛЕНО: Возвращен импорт UserSetting для логики "Автопаса".
+from ..db.models import Chat, ChatSetting, UserSetting
 from ..handlers.game.game_callback import GameCallback
 from ..logic.game_manager import GameManager
 from ..objects import Card, Game, Player
@@ -439,14 +440,31 @@ async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: 
 
     await gm.save_game(game)
 
-    active_players_count = len([p for p in game.players if not p.finished_game])
-    # Авто-пас, если атакующий не может больше подкидывать и в игре мало людей
-    should_autopass = (not game.attacker_can_continue) and (active_players_count < 3)
+    # --- ИСПРАВЛЕНО: Начало универсальной логики "Автопаса" ---
+    attacker = game.current_player
+    attacker_has_autopass = False
+    if attacker:
+        us, _ = await UserSetting.get_or_create(user_id=attacker.id)
+        if us.auto_pass_enabled:
+            attacker_has_autopass = True
 
-    # Если все карты побиты и был пас (или авто-пас), завершаем ход
-    if game.all_beaten_cards and (game.is_pass or should_autopass):
+    forced_pass = not game.attacker_can_continue
+    manual_pass = game.is_pass
+    # --- ИСПРАВЛЕНО: Конец универсальной логики "Автопаса" ---
+
+    # Если все карты побиты и раунд окончен (из-за паса, авто-паса или невозможности подкинуть)
+    if game.all_beaten_cards and (manual_pass or attacker_has_autopass or forced_pass):
+        # Отправляем уведомление, только если это был автоматический пас, а не ручной
+        if attacker_has_autopass and not manual_pass:
+            msg = await bot.send_message(
+                game.id, f"↪️ {attacker.mention} автоматически пасует (настройка Автопас)."
+            )
+            if msg:
+                asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 7, bot))
+        
         await do_turn(game, gm, bot)
     else:
+        # Раунд не окончен, можно подкидывать
         toss_more_markup = types.InlineKeyboardMarkup(inline_keyboard=[
             [types.InlineKeyboardButton(text='↪️ Подкинуть еще', switch_inline_query_current_chat='')]
         ])
@@ -456,6 +474,7 @@ async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: 
             reply_markup=toss_more_markup,
         )
         
-        # Уведомляем, если больше нельзя подкидывать
+        # Уведомляем, если больше нельзя подкидывать (актуально для >2 игроков)
+        active_players_count = len([p for p in game.players if not p.finished_game])
         if not game.allow_atack and active_players_count > 2:
             await send_no_more_attacks_notification(game, bot)
