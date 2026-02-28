@@ -6,8 +6,14 @@ Manual migration to add the 'autopass_enabled' and 'auto_pass_enabled' fields.
 """
 
 import asyncio
+import sys
+import os
 from environs import Env
 from tortoise import Tortoise, run_async
+
+# Добавляем корневую директорию проекта в sys.path
+# Add the project root directory to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 # Убедитесь, что переменные окружения загружены
 # Ensure environment variables are loaded
