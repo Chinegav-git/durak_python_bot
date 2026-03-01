@@ -5,28 +5,12 @@
 Этот модуль отвечает за управление стикерами, которые используются для
 визуального представления карт, колоды и действий в Telegram.
 
-Ключевые компоненты:
-- `ThemeManager`: Singleton-класс, который загружает темы из файлов
-  в директории `durak/objects/decks/` и предоставляет доступ к ID стикеров.
-- `get_sticker_id`: Публичная функция для получения ID стикера по ключу.
-
-Логика тем отделена от `card.py`, чтобы не смешивать модель данных (что такое карта)
-с ее представлением (как карта выглядит в виде стикера).
-
 --------------------------------------------------------------------------------------
 
 Card Theme Manager.
 
 This module is responsible for managing the stickers used for the visual
 representation of cards, the deck, and actions in Telegram.
-
-Key components:
-- `ThemeManager`: A singleton class that loads themes from files
-  in the `durak/objects/decks/` directory and provides access to sticker IDs.
-- `get_sticker_id`: A public function to get a sticker ID by its key.
-
-The theme logic is separated from `card.py` to avoid mixing the data model
-(what a card is) with its presentation (how a card looks as a sticker).
 """
 
 import importlib
@@ -47,8 +31,15 @@ class ThemeManager:
         if self._initialized:
             return
         self._themes: Dict[str, Dict[str, Any]] = {}
-        # Базовые стикеры, используются как fallback и для общих элементов
+        # ИСПРАВЛЕНО: 'classic' тема теперь предзагружается с базовыми стикерами,
+        # чтобы гарантировать её доступность как fallback.
+        # FIXED: The 'classic' theme is now preloaded with base stickers
+        # to ensure its availability as a fallback.
         self._base_stickers = {
+            'normal': {},
+            'grey': {},
+            'trump_normal': {},
+            'trump_grey': {},
             'DECK': {
                 '24': 'CAACAgIAAxkBAAEFiGZi9N7ml8OK63WgrpmMHTRgGig5_QACajEAAurFqUvJj2venJlh-ykE',
                 '23': 'CAACAgIAAxkBAAEFiGhi9N7o92kNdMXkhb2UfweSEGlbXwACdhoAAjgEqUtL9be3AAFMnG8pBA',
@@ -88,6 +79,7 @@ class ThemeManager:
                 'pass': 'CAACAgIAAxkBAAPUaYqSRSdzRqsNYwa_PpuRTyk5pdAAAuGQAAKZOVlIgWO1xu8huGA6BA',
             }
         }
+        self._themes['classic'] = self._base_stickers
         self._initialized = True
 
     def _load_theme(self, theme_name: str) -> None:
@@ -96,38 +88,54 @@ class ThemeManager:
             return
         
         try:
-            # Загружаем модуль из `durak.objects.decks.{theme_name}`
             module = importlib.import_module(f'.decks.{theme_name}', package='durak.objects')
             self._themes[theme_name] = getattr(module, 'THEME', {})
         except (ImportError, AttributeError):
-            # Если тема не найдена, используем "classic" как fallback
+            # ИСПРАВЛЕНО: Теперь, если тема не найдена, она будет ссылаться на уже 
+            # загруженную и гарантированно существующую 'classic' тему.
+            # FIXED: Now, if a theme is not found, it will reference the preloaded
+            # and guaranteed to exist 'classic' theme.
             if theme_name != 'classic':
-                self._load_theme('classic')
-                self._themes[theme_name] = self._themes.get('classic', {})
+                self._themes[theme_name] = self._themes['classic']
             else:
-                self._themes['classic'] = {}
+                # Этого не должно произойти, но на всякий случай.
+                self._themes['classic'] = self._base_stickers
 
     def get_sticker(self, sticker_key: str, theme_name: str = 'classic', style: Optional[str] = None) -> Optional[str]:
         """Получает ID стикера с учетом темы и стиля."""
         self._load_theme(theme_name)
+        theme_dict = self._themes.get(theme_name, {})
 
         # 1. Поиск стилизованной карты в теме (например, серая или козырная)
         if style:
-            theme_dict = self._themes.get(theme_name, {})
             styled_sticker = theme_dict.get(style, {}).get(sticker_key)
             if styled_sticker: 
                 return styled_sticker
 
-        # 2. Поиск специального стикера в теме (например, своя иконка "паса")
-        theme_dict = self._themes.get(theme_name, {})
+        # 2. Поиск обычной карты в теме
+        # ИСПРАВЛЕНО: Добавлен поиск обычной карты (без стиля) в основном 
+        # словаре темы, прежде чем переходить к специальным стикерам.
+        # FIXED: Added search for a regular card (without style) in the main
+        # theme dictionary before proceeding to special stickers.
+        normal_sticker = theme_dict.get('normal', {}).get(sticker_key)
+        if normal_sticker:
+            return normal_sticker
+
+        # 3. Поиск специального стикера в теме (например, своя иконка "паса")
         special_sticker = theme_dict.get('SPECIAL', {}).get(sticker_key)
         if special_sticker:
             return special_sticker
 
-        # 3. Fallback: поиск в базовых (classic) стикерах
-        return self._base_stickers.get('SPECIAL', {}).get(sticker_key) or \
-               self._base_stickers.get('DECK', {}).get(sticker_key) or \
-               self._base_stickers.get('SUIT', {}).get(sticker_key)
+        # 4. Fallback: поиск в базовых (classic) стикерах во всех категориях
+        # ИСПРАВЛЕНО: Логика fallback теперь ищет ключ во всех 
+        # категориях базовых стикеров, а не только в SPECIAL, DECK, SUIT.
+        # FIXED: The fallback logic now searches for the key in all 
+        # categories of base stickers, not just SPECIAL, DECK, SUIT.
+        for category in self._base_stickers.values():
+            if isinstance(category, dict) and sticker_key in category:
+                return category[sticker_key]
+        
+        return None
 
 # Глобальный экземпляр менеджера тем
 _theme_manager = ThemeManager()
@@ -135,13 +143,5 @@ _theme_manager = ThemeManager()
 def get_sticker_id(sticker_key: str, theme_name: str = 'classic', style: Optional[str] = None) -> Optional[str]:
     """
     Публичная функция для простого доступа к стикерам.
-    
-    Args:
-        sticker_key: Ключ стикера (например, "13_h" для короля червей, "pass", "draw").
-        theme_name: Название темы (например, "classic").
-        style: Стиль карты (например, "grey", "trump_normal").
-        
-    Returns:
-        ID файла стикера для Telegram или None, если не найден.
     """
     return _theme_manager.get_sticker(sticker_key, theme_name, style)
