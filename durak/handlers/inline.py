@@ -59,35 +59,42 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l, m):
         from durak.logic.actions import _get_attack_settings
         display_mode, theme_name = await _get_attack_settings(game.id)
 
-        # Показываем игроку его карты и возможные действия
-        # Show the player their cards and possible actions
-        if player.can_play:
-            if game.field: # Если на столе есть карты
-                if player.is_attacker:
-                    # Атакующий может подкинуть или сказать "пас"
-                    for card in player.cards:
-                        result.add_card(
-                            game, card, results, player.can_add_card(card), theme_name
-                        )
-                    result.add_pass(game, results, theme_name)
-                else:
-                    # Защищающийся может побить или взять
-                    for atk_card, def_card in game.field.items():
-                        if def_card: continue
-                        for card in player.cards:
-                            result.add_card(
-                                game, atk_card, results, player.can_beat(atk_card, card), theme_name, def_card=card
-                            )
-                    result.add_draw(game, player, results, theme_name)
-            else:
-                # Если стол пуст, атакующий может походить любой картой
+        # Четко определяем роль игрока
+        is_defender = player == game.opponent_player
+
+        # Логика для защищающегося
+        if is_defender and game.any_unbeaten_card:
+            unbeaten_card = next((c for c, d in game.field.items() if d is None), None)
+            if unbeaten_card:
                 for card in player.cards:
-                    result.add_card(game, card, results, True, theme_name)
+                    # Для каждой карты в руке, проверяем, можно ли ей побить.
+                    # В `add_card` передается True/False, что определяет ее стиль (активная/неактивная).
+                    result.add_card(
+                        game, unbeaten_card, results, player.can_beat(unbeaten_card, card), theme_name, def_card=card
+                    )
+            # У защищающегося всегда есть опция "Взять"
+            result.add_draw(game, player, results, theme_name)
+        
+        # Логика для атакующих или неактивных игроков
         else:
-            # Если не ход игрока, показываем ему серые карты и инфо
-            for card in player.cards:
-                result.add_card(game, card, results, False, theme_name)
-            result.add_gameinfo(game, results, theme_name)
+            playable_cards = player.playable_card_atk()
+
+            if playable_cards:  # Игрок может атаковать (основной или подкидывающий)
+                for card in player.cards:
+                    # Для каждой карты в руке, проверяем, можно ли ей ходить.
+                    # `card in playable_cards` вернет True/False, определяя стиль.
+                    result.add_card(game, card, results, card in playable_cards, theme_name)
+                
+                # Кнопка "Пас" доступна только основному атакующему, если раунд можно завершить
+                if player == game.current_player and game.field and game.all_beaten_cards:
+                    result.add_pass(game, results, theme_name)
+            
+            else:  # Игрок не может ходить
+                for card in player.cards:
+                    # Все карты отображаются как неактивные
+                    result.add_card(game, card, results, False, theme_name)
+                result.add_gameinfo(game, results, theme_name)
+
 
     except NoGameInChatError:
         result.add_no_game(results)
@@ -99,7 +106,7 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l, m):
         results.append(InlineQueryResultArticle(
             id="error",
             title="🚫 Ошибка",
-            input_message_content=InputTextMessageContent(error_message)
+            input_message_content=InputTextMessageContent(message_text=error_message)
         ))
 
     await query.answer(results, is_personal=True, cache_time=1)
