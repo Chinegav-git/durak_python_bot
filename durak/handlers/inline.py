@@ -22,7 +22,7 @@ router = Router()
 
 
 @router.inline_query()
-async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l, m):
+async def inline_query_handler(query: types.InlineQuery, gm: GameManager):
     """
     Обрабатывает все инлайн-запросы.
 

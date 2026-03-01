@@ -50,22 +50,25 @@ async def process_text_action_handler(message: types.Message, gm: GameManager):
             return
 
         # Определяем действие по тексту сообщения
+        # ИСПРАВЛЕНО: Удалены некорректные проверки `player in game.attackers`, 
+        # так как они вызывали ошибку AttributeError.
+        # Проверка на легальность хода инкапсулирована в `actions.do_*`.
         if text == '✅ Пас':
-            if player in game.attackers:
-                await actions.do_pass(game, player, gm, message.bot)
+            await actions.do_pass(game, player, gm, message.bot)
         
         elif text.startswith("🎴"): # "🎴 {mention} взял(а) карты!"
-            if player == game.opponent_player:
-                await actions.do_draw(game, player, gm, message.bot)
+            await actions.do_draw(game, player, gm, message.bot)
 
         elif text.startswith("⚔️"): # "⚔️ Подкинуто карту: <card>"
             card_str = text.split(": ", 1)[1]
             atk_card = Card.from_str(card_str)
-            if atk_card and player in game.attackers:
+            if atk_card:
                 await actions.do_attack_card(game, player, atk_card, gm, message.bot)
 
         elif text.startswith("🛡️"): # "🛡️ Побито карту <card> картой <card>"
-            undefended_card = game.field.get_first_undefended()
+            # ИСПРАВЛЕНО: Заменен вызов несуществующего метода get_first_undefended()
+            # на работающую конструкцию с генератором.
+            undefended_card = next((c for c, d in game.field.items() if d is None), None)
             if not undefended_card:
                 return # Нечего бить
 
@@ -73,7 +76,7 @@ async def process_text_action_handler(message: types.Message, gm: GameManager):
             def_card_str = text.split(" ")[-1]
             def_card = Card.from_str(def_card_str)
             
-            if def_card and player == game.opponent_player:
+            if def_card:
                  # Используем каноническую карту для атаки из состояния игры
                  await actions.do_defence_card(game, player, undefended_card, def_card, gm, message.bot)
 
