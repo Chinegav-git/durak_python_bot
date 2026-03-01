@@ -32,7 +32,7 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l, m):
             return
 
         player = game.player_for_id(user.id)
-        theme_name = game.settings.theme
+        theme_name = m.theme
 
         is_defender = player == game.opponent_player
         is_attacker = player == game.current_player
