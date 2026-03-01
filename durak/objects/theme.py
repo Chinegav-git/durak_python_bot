@@ -4,16 +4,10 @@
 
 Этот модуль отвечает за управление стикерами, которые используются для
 визуального представления карт, колоды и действий в Telegram.
-
---------------------------------------------------------------------------------------
-
-Card Theme Manager.
-
-This module is responsible for managing the stickers used for the visual
-representation of cards, the deck, and actions in Telegram.
 """
 
 import importlib
+import logging
 from typing import Any, Dict, Optional
 
 
@@ -31,15 +25,11 @@ class ThemeManager:
         if self._initialized:
             return
         self._themes: Dict[str, Dict[str, Any]] = {}
-        # ИСПРАВЛЕНО: 'classic' тема теперь предзагружается с базовыми стикерами,
-        # чтобы гарантировать её доступность как fallback.
-        # FIXED: The 'classic' theme is now preloaded with base stickers
-        # to ensure its availability as a fallback.
+        # Базовые стикеры используются как fallback для общих элементов (пас, взять).
+        # Они НЕ являются полноценной темой.
+        # Base stickers are used as a fallback for common elements (pass, draw).
+        # They are NOT a complete theme.
         self._base_stickers = {
-            'normal': {},
-            'grey': {},
-            'trump_normal': {},
-            'trump_grey': {},
             'DECK': {
                 '24': 'CAACAgIAAxkBAAEFiGZi9N7ml8OK63WgrpmMHTRgGig5_QACajEAAurFqUvJj2venJlh-ykE',
                 '23': 'CAACAgIAAxkBAAEFiGhi9N7o92kNdMXkhb2UfweSEGlbXwACdhoAAjgEqUtL9be3AAFMnG8pBA',
@@ -79,7 +69,6 @@ class ThemeManager:
                 'pass': 'CAACAgIAAxkBAAPUaYqSRSdzRqsNYwa_PpuRTyk5pdAAAuGQAAKZOVlIgWO1xu8huGA6BA',
             }
         }
-        self._themes['classic'] = self._base_stickers
         self._initialized = True
 
     def _load_theme(self, theme_name: str) -> None:
@@ -88,54 +77,59 @@ class ThemeManager:
             return
         
         try:
+            # ИСПРАВЛЕНО: Эта логика теперь будет корректно выполняться для 'classic',
+            # так как _themes больше не содержит этот ключ при инициализации.
+            # FIXED: This logic will now execute correctly for 'classic',
+            # as _themes no longer contains this key on initialization.
             module = importlib.import_module(f'.decks.{theme_name}', package='durak.objects')
             self._themes[theme_name] = getattr(module, 'THEME', {})
         except (ImportError, AttributeError):
-            # ИСПРАВЛЕНО: Теперь, если тема не найдена, она будет ссылаться на уже 
-            # загруженную и гарантированно существующую 'classic' тему.
-            # FIXED: Now, if a theme is not found, it will reference the preloaded
-            # and guaranteed to exist 'classic' theme.
+            # Если кастомная тема не найдена, используем classic как fallback.
+            # If a custom theme is not found, use classic as a fallback.
             if theme_name != 'classic':
-                self._themes[theme_name] = self._themes['classic']
+                self._load_theme('classic')
+                self._themes[theme_name] = self._themes.get('classic', {})
             else:
-                # Этого не должно произойти, но на всякий случай.
-                self._themes['classic'] = self._base_stickers
+                # Если даже 'classic' не удалось загрузить, это критическая проблема.
+                # If even 'classic' fails to load, this is a critical issue.
+                logging.critical(f"FATAL: Could not load base theme 'classic'. Inline mode will be broken.")
+                self._themes['classic'] = {}
+
+    def _find_in_base_stickers(self, sticker_key: str) -> Optional[str]:
+        """Вспомогательная функция для поиска ключа в базовых стикерах."""
+        for category in self._base_stickers.values():
+            if sticker_key in category:
+                return category[sticker_key]
+        return None
 
     def get_sticker(self, sticker_key: str, theme_name: str = 'classic', style: Optional[str] = None) -> Optional[str]:
         """Получает ID стикера с учетом темы и стиля."""
         self._load_theme(theme_name)
-        theme_dict = self._themes.get(theme_name, {})
+        theme_dict = self._themes.get(theme_name)
 
-        # 1. Поиск стилизованной карты в теме (например, серая или козырная)
+        # Если тема не загрузилась (например, критический сбой загрузки classic).
+        # If the theme failed to load (e.g., a critical failure of classic).
+        if not theme_dict:
+            return self._find_in_base_stickers(sticker_key)
+
+        # 1. Поиск стилизованной карты в теме (например, 'grey')
         if style:
             styled_sticker = theme_dict.get(style, {}).get(sticker_key)
-            if styled_sticker: 
+            if styled_sticker:
                 return styled_sticker
 
-        # 2. Поиск обычной карты в теме
-        # ИСПРАВЛЕНО: Добавлен поиск обычной карты (без стиля) в основном 
-        # словаре темы, прежде чем переходить к специальным стикерам.
-        # FIXED: Added search for a regular card (without style) in the main
-        # theme dictionary before proceeding to special stickers.
+        # 2. Поиск обычной карты в теме (в категории 'normal')
         normal_sticker = theme_dict.get('normal', {}).get(sticker_key)
         if normal_sticker:
             return normal_sticker
 
-        # 3. Поиск специального стикера в теме (например, своя иконка "паса")
+        # 3. Поиск специального стикера в теме (кастомные 'pass', 'draw')
         special_sticker = theme_dict.get('SPECIAL', {}).get(sticker_key)
         if special_sticker:
             return special_sticker
 
-        # 4. Fallback: поиск в базовых (classic) стикерах во всех категориях
-        # ИСПРАВЛЕНО: Логика fallback теперь ищет ключ во всех 
-        # категориях базовых стикеров, а не только в SPECIAL, DECK, SUIT.
-        # FIXED: The fallback logic now searches for the key in all 
-        # categories of base stickers, not just SPECIAL, DECK, SUIT.
-        for category in self._base_stickers.values():
-            if isinstance(category, dict) and sticker_key in category:
-                return category[sticker_key]
-        
-        return None
+        # 4. Fallback: поиск в глобальных базовых стикерах.
+        return self._find_in_base_stickers(sticker_key)
 
 # Глобальный экземпляр менеджера тем
 _theme_manager = ThemeManager()
