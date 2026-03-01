@@ -20,10 +20,7 @@ from durak.handlers import setup as setup_handlers
 from durak.middleware import GameManagerMiddleware
 from durak.middleware.language_middleware import LanguageMiddleware
 from durak.utils import callback_manager
-# ИСПРАВЛЕНО: Импортируем GameManager для создания единого экземпляра.
-# FIXED: Import GameManager to create a single instance.
 from durak.logic.game_manager import GameManager
-# from durak.utils.set_bot_commands import set_default_commands
 
 
 async def on_startup(bot: Bot):
@@ -31,25 +28,20 @@ async def on_startup(bot: Bot):
     Выполняется при запуске бота. Устанавливает команды и инициализирует БД.
     Executes when the bot starts. Sets commands and initializes the DB.
     """
-    # await set_default_commands(bot)
     await init_db()
-    
-    # Запускаємо періодичне очищення callback'ів
-    # Start periodic callback cleanup
     asyncio.create_task(periodic_callback_cleanup())
-    
     logging.info("Bot started")
 
 
 async def periodic_callback_cleanup():
     """
-    Періодичне очищення старих callback'ів.
+    Периодическое очищение старых callback'ов.
     Periodic cleanup of old callbacks.
     """
     while True:
         try:
             callback_manager.cleanup_old_callbacks()
-            await asyncio.sleep(60)  # Очищення кожну хвилину
+            await asyncio.sleep(60)
         except Exception as e:
             logging.error(f"Callback cleanup error: {e}")
             await asyncio.sleep(60)
@@ -71,31 +63,31 @@ async def main():
     """
     if not Config.BOT_TOKEN:
         logging.critical("КРИТИЧЕСКАЯ ОШИБКА: Переменная окружения BOT_TOKEN не найдена.")
-        logging.critical("Пожалуйста, укажите токен вашего бота в .env файле и перезапустите приложение.")
         sys.exit(1)
 
-    # Используем HTML как основной режим разметки, т.к. большинство
-    # игровых сообщений и упоминаний (`Player.mention`) формируются в HTML.
     bot = Bot(token=Config.BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
     storage = RedisStorage.from_url(f"redis://{Config.REDIS_HOST}:{Config.REDIS_PORT}/{Config.REDIS_DB}")
 
-    # Создаем єдиний екземпляр GameManager
-    # Create a single instance of GameManager
     redis_client = storage.redis
     gm = GameManager(bot, redis_client)
 
-    # ІСПРАВЛЕНО: Внедряем gm в диспетчер для доступу у всіх обробниках.
-    # FIXED: Inject gm into the dispatcher for access in all handlers.
     dp = Dispatcher(storage=storage, game_manager=gm)
     
-    # Реєструємо middleware для передачі gm в обробники
-    # Register middleware to pass gm to handlers
+    # ИСПРАВЛЕНО: Добавлена регистрация middleware для inline_query.
+    # Это устраняет критическую ошибку, из-за которой инлайн-режим
+    # (включая кнопку "Мои карты") не работал, так как обработчики
+    # не получали необходимые зависимости (gm, l, m).
+    # FIXED: Added middleware registration for inline_query.
+    # This resolves a critical error where inline mode (including the "My Cards" button)
+    # was non-functional because handlers were not receiving required
+    # dependencies (gm, l, m).
     dp.update.middleware(GameManagerMiddleware(gm))
     dp.callback_query.middleware(GameManagerMiddleware(gm))
+    dp.inline_query.middleware(GameManagerMiddleware(gm))
     
-    # Register language middleware
     dp.update.middleware(LanguageMiddleware())
     dp.callback_query.middleware(LanguageMiddleware())
+    dp.inline_query.middleware(LanguageMiddleware())
 
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
