@@ -184,20 +184,24 @@ async def set_language_handler(
     # RU: Обработчик, который устанавливает выбранный язык.
     # EN: Handler that sets the selected language.
     """
-    lang_code = callback_data.value
-    await lang_m.set_user_language(call.from_user.id, lang_code)
-    
-    # ИСПРАВЛЕНО: Вместо немедленной перерисовки, которая не работает из-за
-    # особенностей жизненного цикла aiogram, мы просто уведомляем пользователя.
-    # Обновление языка произойдет при следующем запросе (напр. нажатии "Назад").
-    # FIXED: Instead of an immediate redraw, which doesn't work due to an
-    # aiogram lifecycle issue, we just notify the user. The language will
-    # update on the next request (e.g., pressing "Back").
-    l.set_language(lang_code)
-    await call.answer(l.t("language_changed"), show_alert=True)
-    
-    # RU: Перерисовываем клавиатуру, чтобы показать новую активную кнопку
-    # EN: Redraw the keyboard to show the new active button
-    await call.message.edit_reply_markup(
-        reply_markup=get_language_keyboard(lang_code, l)
-    )
+    new_lang_code = callback_data.value
+    current_language = await lang_m.get_user_language(call.from_user.id)
+
+    # ИСПРАВЛЕНО: Предотвращаем ошибку "message is not modified",
+    # выполняя действие только при реальном изменении языка.
+    # FIXED: We prevent the "message is not modified" error by
+    # performing the action only when the language actually changes.
+    if new_lang_code != current_language:
+        await lang_m.set_user_language(call.from_user.id, new_lang_code)
+        l.set_language(new_lang_code)
+        await call.answer(l.t("language_changed"), show_alert=True)
+        
+        # Перерисовываем клавиатуру, чтобы показать новую активную кнопку
+        # Redraw the keyboard to show the new active button
+        await call.message.edit_reply_markup(
+            reply_markup=get_language_keyboard(new_lang_code, l)
+        )
+    else:
+        # Если язык тот же, просто отвечаем на колбэк
+        # If the language is the same, just answer the callback
+        await call.answer()
