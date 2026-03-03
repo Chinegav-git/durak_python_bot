@@ -38,7 +38,9 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l):
 
         # ИСПРАВЛЕНО: Настройки чата (включая тему) получаются вручную.
         # FIXED: Chat settings (including the theme) are retrieved manually.
-        chat, _ = await Chat.get_or_create(id=game.chat_id)
+        # ИСПРАВЛЕНО: Использован `game.id` вместо `game.chat_id` для получения ID чата.
+        # FIXED: Used `game.id` instead of `game.chat_id` to get the chat ID.
+        chat, _ = await Chat.get_or_create(id=game.id)
         chat_settings, _ = await ChatSetting.get_or_create(chat=chat)
 
         player = game.player_for_id(user.id)
