@@ -51,7 +51,7 @@ def get_language_keyboard(
 
 
 async def get_main_settings_keyboard(
-    chat: types.Chat, is_admin: bool, user_id: int, l: I18n, m: LanguageManager
+    chat: types.Chat, is_admin: bool, user_id: int, l: I18n, lang_m: LanguageManager
 ) -> types.InlineKeyboardMarkup:
     """
     # RU: Генерирует и возвращает главное меню настроек.
@@ -60,7 +60,7 @@ async def get_main_settings_keyboard(
     builder = InlineKeyboardBuilder()
 
     if user_id:
-        current_lang = await m.get_user_language(user_id)
+        current_lang = await lang_m.get_user_language(user_id)
         lang_names = {"uk": "UA", "ru": "RU", "en": "EN"}
         current_lang_name = lang_names.get(current_lang, current_lang.upper())
         builder.button(
@@ -95,7 +95,7 @@ async def get_main_settings_keyboard(
 
 
 @router.message(Command("settings"))
-async def settings_command_handler(message: types.Message, l: I18n, m: LanguageManager):
+async def settings_command_handler(message: types.Message, l: I18n, lang_m: LanguageManager):
     """
     # RU: Обработчик команды /settings.
     # EN: Handler for the /settings command.
@@ -106,13 +106,13 @@ async def settings_command_handler(message: types.Message, l: I18n, m: LanguageM
     await message.answer(
         l.t("settings.title"),
         reply_markup=await get_main_settings_keyboard(
-            message.chat, is_admin, message.from_user.id, l, m
+            message.chat, is_admin, message.from_user.id, l, lang_m
         ),
     )
 
 
 @router.callback_query(SettingsCallback.filter(F.level == "main_menu"))
-async def back_to_main_settings_handler(call: types.CallbackQuery, l: I18n, m: LanguageManager):
+async def back_to_main_settings_handler(call: types.CallbackQuery, l: I18n, lang_m: LanguageManager):
     """
     # RU: Обработчик для кнопки "Назад" в главное меню.
     # EN: Handler for the "Back" button to the main menu.
@@ -123,14 +123,14 @@ async def back_to_main_settings_handler(call: types.CallbackQuery, l: I18n, m: L
     await call.message.edit_text(
         l.t("settings.title"),
         reply_markup=await get_main_settings_keyboard(
-            call.message.chat, is_admin, call.from_user.id, l, m
+            call.message.chat, is_admin, call.from_user.id, l, lang_m
         ),
     )
     await call.answer()
 
 
 @router.callback_query(SettingsCallback.filter(F.level == "toggle_sticker_helper"))
-async def toggle_sticker_helper_handler(call: types.CallbackQuery, l: I18n, m: LanguageManager):
+async def toggle_sticker_helper_handler(call: types.CallbackQuery, l: I18n, lang_m: LanguageManager):
     """
     # RU: Обработчик для переключения помощника ID стикеров.
     # EN: Handler for toggling the sticker ID helper.
@@ -157,18 +157,18 @@ async def toggle_sticker_helper_handler(call: types.CallbackQuery, l: I18n, m: L
     )
     await call.message.edit_reply_markup(
         reply_markup=await get_main_settings_keyboard(
-            chat, is_admin, call.from_user.id, l, m
+            chat, is_admin, call.from_user.id, l, lang_m
         )
     )
 
 
 @router.callback_query(SettingsCallback.filter(F.level == "language"))
-async def language_settings_handler(call: types.CallbackQuery, l: I18n, m: LanguageManager):
+async def language_settings_handler(call: types.CallbackQuery, l: I18n, lang_m: LanguageManager):
     """
     # RU: Обработчик, который отображает меню выбора языка.
     # EN: Handler that displays the language selection menu.
     """
-    current_language = await m.get_user_language(call.from_user.id)
+    current_language = await lang_m.get_user_language(call.from_user.id)
     await call.message.edit_text(
         l.t("settings.language_menu_title"),
         reply_markup=get_language_keyboard(current_language, l),
@@ -178,14 +178,14 @@ async def language_settings_handler(call: types.CallbackQuery, l: I18n, m: Langu
 
 @router.callback_query(SettingsCallback.filter(F.level == "set_language"))
 async def set_language_handler(
-    call: types.CallbackQuery, callback_data: SettingsCallback, l: I18n, m: LanguageManager
+    call: types.CallbackQuery, callback_data: SettingsCallback, l: I18n, lang_m: LanguageManager
 ):
     """
     # RU: Обработчик, который устанавливает выбранный язык.
     # EN: Handler that sets the selected language.
     """
     lang_code = callback_data.value
-    await m.set_user_language(call.from_user.id, lang_code)
+    await lang_m.set_user_language(call.from_user.id, lang_code)
     
     # ИСПРАВЛЕНО: Вместо немедленной перерисовки, которая не работает из-за
     # особенностей жизненного цикла aiogram, мы просто уведомляем пользователя.

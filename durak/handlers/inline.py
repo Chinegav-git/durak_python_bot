@@ -7,6 +7,9 @@ Handlers for inline queries to display cards and actions.
 
 from aiogram import Router, types
 
+# ИСПРАВЛЕНО: Добавлены импорты для получения настроек чата.
+# FIXED: Added imports to get chat settings.
+from durak.db.models import Chat, ChatSetting
 from durak.logic import result
 from durak.logic.game_manager import GameManager
 from durak.objects import NoGameInChatError
@@ -14,8 +17,10 @@ from durak.objects import NoGameInChatError
 router = Router()
 
 
+# ИСПРАВЛЕНО: Убран аргумент `m`, так как он не передавался через middleware.
+# FIXED: Removed the `m` argument as it was not being passed via middleware.
 @router.inline_query()
-async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l, m):
+async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l):
     """
     Обрабатывает все инлайн-запросы. Финальная двухуровневая логика.
 
@@ -31,8 +36,13 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l, m):
             await query.answer(results, is_personal=True, cache_time=0)
             return
 
+        # ИСПРАВЛЕНО: Настройки чата (включая тему) получаются вручную.
+        # FIXED: Chat settings (including the theme) are retrieved manually.
+        chat, _ = await Chat.get_or_create(id=game.chat_id)
+        chat_settings, _ = await ChatSetting.get_or_create(chat=chat)
+
         player = game.player_for_id(user.id)
-        theme_name = m.theme
+        theme_name = chat_settings.theme
 
         is_defender = player == game.opponent_player
         is_attacker = player == game.current_player
