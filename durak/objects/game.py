@@ -38,6 +38,7 @@ class Game:
 
         self.attacker_index: int = 0
         self.winner: Player | None = None
+        self.winners: List[Player] = [] # ИСПРАВЛЕНО: Добавлен недостающий атрибут
         self.durak: Player | None = None
         self.is_pass: bool = False
         self.is_final: bool = False

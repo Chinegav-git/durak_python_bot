@@ -127,10 +127,13 @@ async def set_card_theme_callback(call: types.CallbackQuery, callback_data: Sett
     Обновляет запись в базе данных и изменяет клавиатуру, чтобы отразить выбор.
     
     ИСПРАВЛЕНО: Исправлена ошибка валидации при создании чата.
+    ИСПРАВЛЕНО: Убран лишний вызов edit_reply_markup, который приводил к ошибке, если тема не менялась.
+    
     Sets the chosen card theme from a callback.
     Updates the database record and modifies the keyboard to reflect the choice.
     
     FIXED: Fixed validation error during chat creation.
+    FIXED: Removed unnecessary call to edit_reply_markup that caused an error if the theme was not changed.
     """
     new_theme = callback_data.value
     chat = call.message.chat
@@ -140,13 +143,20 @@ async def set_card_theme_callback(call: types.CallbackQuery, callback_data: Sett
         defaults={'title': chat.title or "Unknown", 'type': chat.type}
     )
     chat_setting, _ = await ChatSetting.get_or_create(chat=db_chat)
+
+    # ИСПРАВЛЕНО: Проверяем, отличается ли новая тема от текущей, чтобы избежать ошибки
+    # FIXED: Check if the new theme is different from the current one to avoid an error
     if chat_setting.card_theme != new_theme:
         chat_setting.card_theme = new_theme
         await chat_setting.save()
+        
+        # Обновляем клавиатуру только если тема была изменена
+        # Update the keyboard only if the theme has been changed
+        await call.message.edit_reply_markup(
+            reply_markup=await get_card_theme_keyboard(chat)
+        )
         await call.answer(f"✅ Тема изменена на {new_theme.capitalize()}")
     else:
+        # Если тема та же, просто отвечаем пользователю без редактирования сообщения
+        # If the theme is the same, just answer the user without editing the message
         await call.answer("Эта тема уже установлена")
-
-    await call.message.edit_reply_markup(
-        reply_markup=await get_card_theme_keyboard(chat)
-    )

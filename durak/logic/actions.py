@@ -144,13 +144,12 @@ async def send_no_more_attacks_notification(game: Game, bot: Bot):
 async def win(game: Game, player: Player, gm: GameManager, bot: Bot):
     """
     Обрабатывает победу игрока. Отправляет сообщение и сохраняет победителя.
+    ИСПРАВЛЕНО: Удалена проверка `hasattr`, так как `game.winners` теперь всегда существует.
 
     Handles a player's victory. Sends a message and saves the winner.
+    FIXED: Removed `hasattr` check, as `game.winners` now always exists.
     """
     # await _update_win_stats(player.id) # Статистика временно отключена
-    
-    if not hasattr(game, 'winners'):
-        game.winners = []
 
     if player not in game.winners:
         if not game.winner:
