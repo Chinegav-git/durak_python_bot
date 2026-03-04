@@ -32,7 +32,7 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l):
     try:
         game = await gm.get_game_by_user_id(user.id)
         if not game or not game.started:
-            result.add_no_game(results)
+            result.add_no_game(results, l)
             await query.answer(results, is_personal=True, cache_time=0)
             return
 
@@ -59,10 +59,10 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l):
                     result.add_card(
                         game, unbeaten_card, results,
                         player.can_beat(unbeaten_card, card),
-                        theme_name, def_card=card
+                        theme_name, l, def_card=card
                     )
             # У защищающегося всегда есть опция "Взять".
-            result.add_draw(game, player, results, theme_name)
+            result.add_draw(game, player, results, theme_name, l)
 
         # --- Блок 2: Логика для ВСЕХ ОСТАЛЬНЫХ (атака, подкидывание, ожидание) --- #
         else:
@@ -72,17 +72,17 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l):
 
             for card in player.cards:
                 # Карты активны, только если они есть в списке доступных для хода.
-                result.add_card(game, card, results, card in playable_cards, theme_name)
+                result.add_card(game, card, results, card in playable_cards, theme_name, l)
             
             # Стикер "Пас" виден ТОЛЬКО главному атакующему.
             if is_attacker:
-                result.add_pass(game, results, theme_name)
+                result.add_pass(game, results, theme_name, l)
 
             # Стикер "Инфо" виден всем, кто не защищается.
-            result.add_gameinfo(game, results, theme_name)
+            result.add_gameinfo(game, results, theme_name, l)
 
     except NoGameInChatError:
-        result.add_no_game(results)
+        result.add_no_game(results, l)
     
     except Exception as e:
         results.append(types.InlineQueryResultArticle(
