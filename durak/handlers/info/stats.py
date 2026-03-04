@@ -50,7 +50,7 @@ async def show_stats_handler(message: types.Message, l: I18n):
             "",
             l.t('stats.games_played', count=hcode(games_played)),
             l.t('stats.wins', count=hcode(wins)),
-            l.t('stats.win_rate', percentage=hcode(f'{win_rate:.1f}%'))),
+            l.t('stats.win_rate', percentage=hcode(f'{win_rate:.1f}%')),
             "---",
             l.t('stats.cards_played', count=hcode(user_settings.cards_played)),
             l.t('stats.cards_beaten', count=hcode(user_settings.cards_beaten)),
