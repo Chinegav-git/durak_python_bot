@@ -74,7 +74,7 @@ class Card:
         self.suit: Suits = suit if isinstance(suit, Suits) else Suits(str(suit))
 
     def __str__(self) -> str:
-        """Возвращает красивое текстовое представление, например: 'A ♥'."""
+        """Возвращает красивое текстовое представление, например: 'Т ♥'."""
         value_map = {Values.JACK: 'В', Values.QUEEN: 'Д', Values.KING: 'К', Values.ACE: 'Т'}
         value_str = value_map.get(self.value, self.value.value)
         suit_map = {Suits.DIAMOND: SuitsIcons.DIAMOND, Suits.HEART: SuitsIcons.HEART, Suits.CLUB: SuitsIcons.CLUB, Suits.SPADE: SuitsIcons.SPADE}
@@ -105,49 +105,63 @@ class Card:
         """Хеш для использования карты в качестве ключа словаря или в множестве."""
         return hash((self.value, self.suit))
 
-
     @classmethod
-    def from_repr(cls, value: str) -> "Card":
+    def from_str(cls, string: str) -> "Card":
         """
-        Восстанавливает объект `Card` из внутреннего строкового представления,
-        возвращаемого `__repr__`, например: "14_h".
+        Универсальный фабричный метод для создания карты из строки.
+        Поддерживает два формата:
+        1. Технический (внутренний): "value_suit", например, "14_s" или "k_h".
+        2. Визуальный (локализованный): "ValueSuitIcon", например, "Т♠" или "10♥".
         
-        Restores a `Card` instance from its internal string representation
-        returned by `__repr__`, e.g.: "14_h".
+        Universal factory method to create a card from a string.
+        Supports two formats:
+        1. Technical (internal): "value_suit", e.g., "14_s" or "k_h".
+        2. Visual (localized): "ValueSuitIcon", e.g., "Т♠" or "10♥".
         """
-        # Используем существующую фабричную функцию для единообразного парсинга.
-        return from_str(value)
+        string = string.strip().lower()
 
-def from_str(string: str) -> 'Card':
-    """
-    Фабричная функция для создания карты из ее строкового представления.
-    
-    Примеры:
-    - from_str("14_s") -> Card(ACE, SPADE)
-    - from_str("k_h") -> Card(KING, HEART)
-    
-    Raises:
-        ValueError: Если строка имеет неверный формат.
-    
-    Factory function to create a card from its string representation.
-    """
-    parts = string.strip().lower().split('_')
-    if len(parts) != 2:
-        raise ValueError(f'Неверный формат строки для карты: {string}')
+        # Попытка 1: Парсинг технического формата ("14_s")
+        # Attempt 1: Parse technical format ("14_s")
+        if '_' in string:
+            parts = string.split('_')
+            if len(parts) == 2:
+                value_part, suit_part = parts
+                
+                value_map = {'j': Values.JACK, 'q': Values.QUEEN, 'k': Values.KING, 'a': Values.ACE}
+                value = value_map.get(value_part, Values(value_part) if value_part.isdigit() else None)
+                
+                if value in Values and suit_part in Suits:
+                    return cls(value, Suits(suit_part))
 
-    value_part, suit_part = parts
+        # Попытка 2: Парсинг визуального формата ("Т♠")
+        # Attempt 2: Parse visual format ("Т♠")
+        # ИСПРАВЛЕНО: Оригинальный код не мог парсить `callback_data` из-за отсутствия этого блока.
+        # FIXED: The original code could not parse `callback_data` due to the absence of this block.
+        suit_icon_map = {
+            '♦': Suits.DIAMOND, '♥': Suits.HEART, '♣': Suits.CLUB, '♠': Suits.SPADE,
+            'd': Suits.DIAMOND, 'h': Suits.HEART, 'c': Suits.CLUB, 's': Suits.SPADE,
+        }
+        
+        value_str_map = {
+            '6': Values.SIX, '7': Values.SEVEN, '8': Values.EIGHT, '9': Values.NINE, '10': Values.TEN,
+            'в': Values.JACK, 'j': Values.JACK,
+            'д': Values.QUEEN, 'q': Values.QUEEN,
+            'к': Values.KING, 'k': Values.KING,
+            'т': Values.ACE, 'a': Values.ACE
+        }
 
-    # Преобразование буквенных значений (J, Q, K, A)
-    value_map = {'j': Values.JACK, 'q': Values.QUEEN, 'k': Values.KING, 'a': Values.ACE}
-    value = value_map.get(value_part, Values(value_part) if value_part.isdigit() else None)
-    
-    if value is None or value not in Values:
-        raise ValueError(f'Неизвестное достоинство карты: {value_part}')
+        suit = None
+        value_str = string
+        
+        # Извлекаем масть из конца строки
+        # Extract suit from the end of the string
+        for icon, suit_enum in suit_icon_map.items():
+            if string.endswith(icon):
+                suit = suit_enum
+                value_str = string[:-len(icon)].strip()
+                break
+        
+        if suit and value_str in value_str_map:
+            return cls(value_str_map[value_str], suit)
 
-    # Преобразование масти
-    if suit_part not in Suits:
-        raise ValueError(f'Неизвестная масть карты: {suit_part}')
-    
-    suit = Suits(suit_part)
-
-    return Card(value, suit)
+        raise ValueError(f"Не удалось распознать карту из строки: '{string}' / Could not recognize card from string: '{string}'")

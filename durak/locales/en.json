@@ -104,6 +104,15 @@
     "trump": "One card is randomly chosen as the trump card.",
     "goal": "The first player to get rid of all cards wins."
   },
+  "inline": {
+    "my_cards_title": "🃏 My cards",
+    "my_cards_description": "You have {count} cards. Trump: {trump_icon}",
+    "my_cards_no_game": "You are not in a game!",
+    "my_cards_no_cards": "You have no cards!",
+    "my_cards_text": "You have in your hand:\n{cards_list}",
+    "attack_action": "Attack: {card}",
+    "defend_action": "Defend: {card}"
+  },
   "errors": {
     "unexpected": "An unexpected error occurred while leaving the game: {error}",
     "callback_cleanup": "Callback cleanup error: {error}"

@@ -27,11 +27,11 @@ from aiogram.types import (
     InputTextMessageContent,
 )
 
-from config import Commands
 from ..objects import Card, Game, Player, theme as th
+from ..utils.i18n import I18n
 
 
-def add_no_game(results: List[InlineQueryResult]):
+def add_no_game(results: List[InlineQueryResult], l: I18n):
     """
     Добавляет сообщение о том, что пользователь не участвует в игре.
     Adds a message indicating that the user is not participating in a game.
@@ -39,18 +39,16 @@ def add_no_game(results: List[InlineQueryResult]):
     results.append(
         InlineQueryResultArticle(
             id="nogame",
-            title="🎮 Вы не играете",
+            title=l.t('inline.my_cards_title'),
+            description=l.t('inline.my_cards_no_game'),
             input_message_content=InputTextMessageContent(
-                message_text='🚫 Вы сейчас не играете. Используйте /new чтобы '
-                'начать игру или /join, чтобы присоединиться к '
-                'текущей игре в этой группе',
-                parse_mode="HTML"
+                message_text=l.t('game.no_game')
             ),
         )
     )
 
 
-def add_not_started(results: List[InlineQueryResult]):
+def add_not_started(results: List[InlineQueryResult], l: I18n):
     """
     Добавляет сообщение о том, что игра еще не началась.
     Adds a message indicating that the game has not yet started.
@@ -58,16 +56,16 @@ def add_not_started(results: List[InlineQueryResult]):
     results.append(
         InlineQueryResultArticle(
             id="notstarted",
-            title="⏳ Игра еще не началась",
+            title=l.t('inline.my_cards_title'),
+            description=l.t('game.already_started'),
             input_message_content=InputTextMessageContent(
-                message_text=f'🚀 Начать игру: /{Commands.START}',
-                parse_mode="HTML"
+                message_text=l.t('game.already_started')
             ),
         )
     )
 
 
-def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme_name: str):
+def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme_name: str, l: I18n):
     """
     Добавляет опцию "Взять карты" в виде стикера.
     Adds a "Draw cards" option as a sticker.
@@ -81,14 +79,13 @@ def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme
             id="draw",
             sticker_file_id=sticker_id,
             input_message_content=InputTextMessageContent(
-                message_text=f"🎴 {player.mention} взял(а) карты!",
-                parse_mode="HTML"
+                message_text=l.t('game.take_action', name=player.mention)
             ),
         )
     )
 
 
-def add_pass(game: Game, results: List[InlineQueryResult], theme_name: str):
+def add_pass(game: Game, results: List[InlineQueryResult], theme_name: str, l: I18n):
     """
     Добавляет опцию "Пас" в виде стикера.
     Adds a "Pass" option as a sticker.
@@ -102,8 +99,7 @@ def add_pass(game: Game, results: List[InlineQueryResult], theme_name: str):
             id="pass",
             sticker_file_id=sticker_id,
             input_message_content=InputTextMessageContent(
-                message_text='✅ Пас',
-                parse_mode="HTML"
+                message_text=l.t('game.pass_action')
             ),
         )
     )
@@ -115,6 +111,7 @@ def add_card(
     results: List[InlineQueryResult],
     can_play: bool,
     theme_name: str,
+    l: I18n,
     def_card: Card = None,
 ):
     """
@@ -140,17 +137,16 @@ def add_card(
 
     if can_play:
         if def_card:
-            message_text = f"🛡️ Побито карту {str(atk_card)} картой {str(def_card)}"
+            message_text = l.t('inline.defend_action', card=str(def_card))
         else:
-            message_text = f"⚔️ Подкинуто карту: {str(atk_card)}"
+            message_text = l.t('inline.attack_action', card=str(atk_card))
 
         results.append(
             Sticker(
                 id=id_,
                 sticker_file_id=sticker_id,
                 input_message_content=InputTextMessageContent(
-                    message_text=message_text,
-                    parse_mode="HTML"
+                    message_text=message_text
                 ),
             )
         )
@@ -159,12 +155,12 @@ def add_card(
             Sticker(
                 id=str(uuid4()),  # Уникальный ID, чтобы избежать коллизий
                 sticker_file_id=sticker_id,
-                input_message_content=game_info(game)  # Показываем общую инфу
+                input_message_content=game_info(game, l)  # Показываем общую инфу
             )
         )
 
 
-def game_info(game: Game) -> InputTextMessageContent:
+def game_info(game: Game, l: I18n) -> InputTextMessageContent:
     """
     Формирует подробную информацию о текущем состоянии игры.
     Generates detailed information about the current game state.
@@ -177,20 +173,22 @@ def game_info(game: Game) -> InputTextMessageContent:
     )
 
     return InputTextMessageContent(
-        message_text=(
-            f"<b>🎮 Информация об игре</b>\n\n"
-            f"⚔️ <b>Атакующий:</b> {game.current_player.mention} ({len(game.current_player.cards)} карт)\n"
-            f"🛡️ <b>Защитник:</b> {game.opponent_player.mention} ({len(game.opponent_player.cards)} карт)\n\n"
-            f"🎯 <b>Козырь:</b> {game.deck.trump_ico}\n"
-            f"📦 <b>В колоде:</b> {len(game.deck.cards)} карт\n\n"
-            f"<b>👥 Игроки:</b>{players_info}\n"
-            f"<b>🏟️ Поле:</b>{field_info if game.field else '  (пусто)'}\n"
+        message_text=l.t(
+            'game.info_text',
+            attacker_mention=game.current_player.mention,
+            attacker_cards=len(game.current_player.cards),
+            defender_mention=game.opponent_player.mention,
+            defender_cards=len(game.opponent_player.cards),
+            trump_icon=game.deck.trump_ico,
+            deck_size=len(game.deck.cards),
+            players_info=players_info,
+            field_info=field_info if game.field else l.t('game.field_empty')
         ),
         parse_mode="HTML",
     )
 
 
-def add_gameinfo(game: Game, results: List[InlineQueryResult], theme_name: str):
+def add_gameinfo(game: Game, results: List[InlineQueryResult], theme_name: str, l: I18n):
     """
     Добавляет опцию для отображения информации об игре.
     Adds an option to display game information.
@@ -203,6 +201,6 @@ def add_gameinfo(game: Game, results: List[InlineQueryResult], theme_name: str):
         Sticker(
             id="gameinfo",
             sticker_file_id=sticker_id,
-            input_message_content=game_info(game)
+            input_message_content=game_info(game, l)
         )
     )

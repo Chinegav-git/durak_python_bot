@@ -104,6 +104,15 @@
     "trump": "Одна карта случайным образом выбирается козырем.",
     "goal": "Первый игрок, который избавится от всех карт, побеждает."
   },
+  "inline": {
+    "my_cards_title": "🃏 Мои карты",
+    "my_cards_description": "У вас {count} карт. Козырь: {trump_icon}",
+    "my_cards_no_game": "Вы не в игре!",
+    "my_cards_no_cards": "У вас нет карт!",
+    "my_cards_text": "У вас в руке:\n{cards_list}",
+    "attack_action": "Атака: {card}",
+    "defend_action": "Защита: {card}"
+  },
   "errors": {
     "unexpected": "Произошла непредвиденная ошибка при выходе из игры: {error}",
     "callback_cleanup": "Callback cleanup error: {error}"
