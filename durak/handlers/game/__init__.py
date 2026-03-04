@@ -25,6 +25,7 @@ def setup(game_manager=None) -> Router:
     внутри пакета `game`.
     
     ИСПРАВЛЕНО: Добавлены docstring'и для модуля и функции.
+    ИСПРАВЛЕНО: `actions` перемещен в конец для правильного порядка регистрации обработчиков.
 
     Sets up and returns the main router for all game handlers.
 
@@ -32,6 +33,7 @@ def setup(game_manager=None) -> Router:
     within the `game` package.
 
     FIXED: Added docstrings for the module and the function.
+    FIXED: `actions` moved to the end for correct handler registration order.
     """
     # Ленивый импорт для предотвращения циклических зависимостей
     # Lazy import to prevent circular dependencies
@@ -60,10 +62,11 @@ def setup(game_manager=None) -> Router:
         lobby_kick.gm = game_manager
         test_win.gm = game_manager
 
-    # Регистрация всех игровых роутеров
-    # Register all game routers
+    # Регистрация всех игровых роутеров.
+    # ПОРЯДОК ВАЖЕН: сначала специфичные команды, потом общие текстовые обработчики.
+    # Register all game routers.
+    # ORDER IS IMPORTANT: specific commands first, then generic text handlers.
     for module in (
-        actions,
         auto_leave,
         close,
         global_leave,
@@ -76,6 +79,9 @@ def setup(game_manager=None) -> Router:
         start,
         test_win,
         process_chosen,
+        # `actions` должен быть последним, чтобы не перехватывать команды
+        # `actions` must be last to avoid intercepting commands
+        actions,
     ):
         router.include_router(module.router)
 
