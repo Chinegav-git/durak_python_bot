@@ -14,6 +14,7 @@
 
 ## 💡 Задачи для Рефакторинга и Исследования / Refactoring & Research Tasks
 
+-   [ ] **Реализация команды `/top`:** Восстановить или реализовать с нуля команду `/top` для отображения рейтинга игроков (глобального или по чату).
 -   [ ] **Рефакторинг тем:** Вынести `SPECIAL` стикеры (`pass`, `draw`, `info`) из `theme.py` в файлы конкретных тем (например, `classic.py`), чтобы все ресурсы темы хранились в одном месте.
 -   [ ] **Исследование стикеров `DECK`:** Провести `grep` по кодовой базе, чтобы выяснить, используются ли стикеры `DECK` из `theme.py`. Если нет — удалить их для очистки кода.
 
@@ -71,12 +72,11 @@
 -   [x] `durak/logic/game_manager.py` (проверен, соответствует норме)
 -   [x] `durak/locales/*.json` (проверены, приведены в соответствие)
 
-### Фаза 4: Настройки и Статистика / Phase 4: Settings and Statistics (В процессе / In Progress)
+### Фаза 4: Настройки и Статистика / Phase 4: Settings and Statistics (✅ Завершено / Completed)
 
 -   [x] `durak/handlers/settings.py` (критические ошибки вызова API в ЛС исправлены)
--   [x] `durak/handlers/inline.py` (✅ **Восстановлена полная функциональность инлайн-режима / Full functionality of inline mode restored**) 
--   [ ] `durak/handlers/info/stats.py` (восстановление команды `/stats` с использованием новой структуры данных)
--   [ ] `durak/handlers/info/top.py` (восстановление функционала рейтинга `/top` по чату / игре)
+-   [x] `durak/handlers/inline.py` (✅ **Восстановлена полная функциональность инлайн-режима / Full functionality of inline mode restored**)
+-   [x] `durak/handlers/info/stats.py` (✅ **Восстановлена команда `/stats` / `/stats` command restored**)
 -   [ ] **Статистика (Statistics):** Проверить корректность отображения статистики после рефакторинга сериализации.
 
 ### Фаза 5: Команды Администрирования / Phase 5: Admin Commands (Планируется / Planned)

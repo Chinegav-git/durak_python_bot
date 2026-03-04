@@ -79,6 +79,16 @@
     "theme_already_set": "This theme is already set",
     "stats_control": "📊 Statistics management has been moved to a unified settings menu.\n\n👉 Please use the /{command} command to view or change your settings."
   },
+  "stats": {
+    "header": "📊 Statistics for {player_name}",
+    "games_played": "Games played: {count}",
+    "wins": "Wins: {count}",
+    "win_rate": "Win rate: {percentage}",
+    "cards_played": "Cards played: {count}",
+    "cards_beaten": "Cards beaten: {count}",
+    "cards_attack": "Cards attacked with: {count}",
+    "stats_disabled": "🚫 Statistics collection is disabled for you. You can enable it in the settings menu: {settings_command}"
+  },
   "help": {
     "title": "🎮 **Help for \"Durak\" Game**",
     "description": "This bot allows you to play the card game \"Durak\" with friends in Telegram.",
