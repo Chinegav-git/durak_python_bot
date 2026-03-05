@@ -1,3 +1,4 @@
+
 THEME = {
     'SUIT': {
         'd': 'CAACAgIAAxkBAAEFiFhi9N6WsmoVGiVCARK0PaEPy1hxIwACEh4AAnTOqEtb-7pItmYVoSkE',
@@ -6,12 +7,9 @@ THEME = {
         'c': 'CAACAgIAAxkBAAEFiF5i9N6ePrpgsVNpA7xD904tUTCjWQACyhoAAlehqUvmgY-dQGLnSikE'
     },
     'SPECIAL': {
-        # 'draw': 'CAACAgIAAxkBAAEFiGBi9N6gipaKIexU7cVWyxcci2juyAACSx0AArAMqEt3c1jfI8dsHikE',
-        # 'info': 'CAACAgIAAxkBAAPTaYqSQpE7QBqI6RxQy1V_f7X8AfQAAt-QAAKZOVlI_g93-bxV3SM6BA',
-        # 'pass': 'CAACAgIAAxkBAAPUaYqSRSdzRqsNYwa_PpuRTyk5pdAAAuGQAAKZOVlIgWO1xu8huGA6BA',
-        'draw': 'CAACAgIAAxkBAAEFh7pi9NRDcCPWuNKz0LC62J3TM7CGaAACSBkAAt0vkEtZKUcC8YvNVSkE',
-        'info': 'CAACAgIAAxkBAAEFh7pi9NRDcCPWuNKz0LC62J3TM7CGaAACSBkAAt0vkEtZKUcC8YvNVSkE',
-        'pass': 'CAACAgIAAxkBAAEFh7pi9NRDcCPWuNKz0LC62J3TM7CGaAACSBkAAt0vkEtZKUcC8YvNVSkE',
+        'draw': 'CAACAgIAAxkBAAEFiGBi9N6gipaKIexU7cVWyxcci2juyAACSx0AArAMqEt3c1jfI8dsHikE',
+        'info': 'CAACAgIAAxkBAAPTaYqSQpE7QBqI6RxQy1V_f7X8AfQAAt-QAAKZOVlI_g93-bxV3SM6BA',
+        'pass': 'CAACAgIAAxkBAAPUaYqSRSdzRqsNYwa_PpuRTyk5pdAAAuGQAAKZOVlIgWO1xu8huGA6BA',
     },
     'normal': {
 

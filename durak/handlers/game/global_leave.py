@@ -44,7 +44,7 @@ async def global_leave_handler(message: types.Message, bot: Bot, gm: GameManager
 
     mention = user.first_name
     game_chat_id = game.id
-    chat_title = game.chat_title_or_id()
+    chat_title = game.chat_title
 
     try:
         await actions.do_leave_player(game, player, gm, message.bot)
@@ -62,7 +62,7 @@ async def global_leave_handler(message: types.Message, bot: Bot, gm: GameManager
         # Notify the user who sent the command
         await message.answer(
             f'👋 Ви покинули гру в чаті "{chat_title}", і вона була завершена, '
-            "оскільки ви були останнім гравцем."
+            '"оскільки ви були останнім гравцем."'
         )
         
         # Notify the game chat, if it's a different chat
@@ -70,7 +70,7 @@ async def global_leave_handler(message: types.Message, bot: Bot, gm: GameManager
             await bot.send_message(
                 game_chat_id,
                 f"👋 {mention} покинув(ла) гру як останній гравець.\n"
-                "🎮 Гра завершена!",
+                '"🎮 Гра завершена!"',
             )
 
     except Exception as e:
