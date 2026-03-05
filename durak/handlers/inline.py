@@ -85,10 +85,11 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l):
         result.add_no_game(results, l)
     
     except Exception as e:
+        error_message = str(e) if str(e) else "Неизвестная ошибка"
         results.append(types.InlineQueryResultArticle(
             id="error",
-            title=f"🚫 Ошибка: {e}",
-            input_message_content=types.InputTextMessageContent(message_text=f"Произошла непредвиденная ошибка: {e}")
+            title=f"🚫 Ошибка: {error_message}",
+            input_message_content=types.InputTextMessageContent(message_text=f"Произошла непредвиденная ошибка: {error_message}")
         ))
 
     await query.answer(results, is_personal=True, cache_time=0)
