@@ -49,7 +49,11 @@
     "started_successfully": "🚀 Игра началась!",
     "old_button": "Эта кнопка больше не актуальна.",
     "current_mode": "Текущий режим игры: `{mode}`.",
-    "change_mode": "Чтобы изменить режим, воспользуйтесь меню /settings."
+    "change_mode": "Чтобы изменить режим, воспользуйтесь меню /settings.",
+    "info_text": "⚔️ <b>Атака:</b> {attacker_mention}\n🛡️ <b>Защита:</b> {defender_mention}\n\n🃏 <b>Игроки:</b>{players_info}\n\n<b>Стол:</b>{field_info}\n\n♦️ <b>Козырь:</b> {trump_icon}\n📇 <b>Колода:</b> {deck_size}",
+    "field_empty": "\n  <i>(пусто)</i>",
+    "take_action": "📥 {name} берёт карты.",
+    "pass_action": "✅ Пас"
   },
   "round": {
     "start_header": "Начало раунда",
@@ -122,6 +126,6 @@
     "bot_stopped": "Bot stopped",
     "critical_token": "КРИТИЧЕСКАЯ ОШИБКА: Переменная окружения BOT_TOKEN не найдена.",
     "token_instructions": "Пожалуйста, укажите токен вашего бота в .env файле и перезапустите приложение.",
-    "admins_warning": "ПРЕДУПРЕЖДЕНИЕ: Переменная окружения ADMINS ('{admins}') содержит нечисловые значения и будет проигнорирована."
+    "admins_warning": "ПРЕДУПРЕЖДЕНИЕ: Переменная окружения ADMINS (\'{admins}\') содержит нечисловые значения и будет проигнорирована."
   }
 }
