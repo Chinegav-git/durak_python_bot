@@ -91,5 +91,10 @@ async def inline_query_handler(query: types.InlineQuery, gm: GameManager, l):
             title=f"🚫 Ошибка: {error_message}",
             input_message_content=types.InputTextMessageContent(message_text=f"Произошла непредвиденная ошибка: {error_message}")
         ))
+    
+    # ИСПРАВЛЕНО: Добавлена защита от отправки пустого списка результатов, что вызывает DOCUMENT_INVALID.
+    # FIXED: Added protection against sending an empty list of results, which causes DOCUMENT_INVALID.
+    if not results:
+        result.add_no_game(results, l)
 
     await query.answer(results, is_personal=True, cache_time=0)
