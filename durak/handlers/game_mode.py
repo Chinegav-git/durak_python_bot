@@ -94,8 +94,8 @@ async def set_game_mode(message: types.Message):
     current_mode = chat_setting.game_mode
 
     await message.answer(
-        f"Поточний режим гри: `{current_mode}`.\n\n"
-        f"Щоб змінити режим, скористайтеся меню /settings.",
+        f"Текущий режим игры: `{current_mode}`.\n\n"
+        f"Чтобы изменить режим, воспользуйтесь меню /settings.",
         parse_mode='Markdown'
     )
 
@@ -107,7 +107,7 @@ async def show_gamemode_settings(call: types.CallbackQuery):
     Shows the game mode selection menu when the button in settings is pressed.
     """
     await call.message.edit_text(
-        "✍️ **Режим гри**\n\nВиберіть, как будут відображатися карти та ігровый процесс:",
+        "✍️ <b>Режим игры</b>\n\nВыберите, как будут отображаться карты и игровой процесс:",
         reply_markup=await get_gamemode_keyboard(call.message.chat)
     )
     await call.answer()
@@ -141,7 +141,7 @@ async def set_gamemode_callback(call: types.CallbackQuery, callback_data: Settin
     if chat_setting.game_mode != new_mode:
         chat_setting.game_mode = new_mode
         await chat_setting.save()
-        await call.answer("✅ Режим гри змінено")
+        await call.answer("✅ Режим игры изменен")
         
         # Обновление клавиатуры для отображения нового выбора
         # Update the keyboard to show the new selection
@@ -149,4 +149,4 @@ async def set_gamemode_callback(call: types.CallbackQuery, callback_data: Settin
             reply_markup=await get_gamemode_keyboard(chat)
         )
     else:
-        await call.answer("Цей режим вже встановлено")
+        await call.answer("Этот режим уже установлен")

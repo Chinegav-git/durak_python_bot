@@ -19,19 +19,14 @@ router = Router()
 def get_available_themes():
     """
     Возвращает отсортированный список доступных тем карт.
-    Темы определяются по наличию .py файлов в директории `durak/objects/themes`.
-    
-    ИСПРАВЛЕНО: Путь к темам обновлен с `decks` на `themes`.
+    Темы определяются по наличию .py файлов в директории `durak/objects/decks`.
 
     Returns a sorted list of available card themes.
-    Themes are identified by the presence of .py files in the `durak/objects/themes` directory.
-    
-    FIXED: The path to themes has been updated from `decks` to `themes`.
+    Themes are identified by the presence of .py files in the `durak/objects/decks` directory.
     """
-    # ИСПРАВЛЕНО: Путь изменен на корректный
     themes_path = os.path.join("durak", "objects", "decks")
     if not os.path.isdir(themes_path):
-        return [] # Возвращаем пустой список, если директория не найдена
+        return []
     
     return sorted([
         f.split('.')[0] 
@@ -44,11 +39,8 @@ async def get_card_theme_keyboard(chat: types.Chat):
     Генерирует клавиатуру для настроек темы карт.
     Отмечает текущую выбранную тему.
     
-    ИСПРАВЛЕНО: Теперь принимает объект chat для корректного создания записи в БД.
     Generates the keyboard for card theme settings.
     Marks the currently selected theme.
-    
-    FIXED: Now takes a chat object to correctly create a DB record.
     """
     db_chat, _ = await Chat.get_or_create(
         id=chat.id, 
@@ -60,14 +52,15 @@ async def get_card_theme_keyboard(chat: types.Chat):
 
     available_themes = get_available_themes()
     if not available_themes:
-        # Если темы не найдены, добавляем сообщение об ошибке
         builder.row(types.InlineKeyboardButton(
-            text="⚠️ Теми не знайдено!",
+            text="⚠️ Темы не найдены!",
             callback_data="ignore"
         ))
     else:
         for theme_id in available_themes:
-            text = f'''» {theme_id.capitalize()} «''' if current_theme == theme_id else theme_id.capitalize()
+            # ИСПРАВЛЕНО: Убрано .capitalize(), чтобы избежать проблем с именами файлов.
+            # FIXED: Removed .capitalize() to avoid issues with filenames.
+            text = f'''» {theme_id} «''' if current_theme == theme_id else theme_id
             builder.button(
                 text=text,
                 callback_data=SettingsCallback(level="card_theme_select", value=theme_id).pack()
@@ -87,11 +80,8 @@ async def set_card_theme(message: types.Message):
     Обработчик команды /cardtheme.
     Сообщает пользователю текущую тему и предлагает использовать /settings для изменения.
     
-    ИСПРАВЛЕНО: Добавлены обязательные поля при создании чата в БД.
     Handler for the /cardtheme command.
     Informs the user about the current theme and suggests using /settings to change it.
-    
-    FIXED: Mandatory fields added when creating a chat in the DB.
     """
     db_chat, _ = await Chat.get_or_create(
         id=message.chat.id, 
@@ -114,7 +104,7 @@ async def show_card_theme_settings(call: types.CallbackQuery):
     Shows the card theme selection menu when the button in settings is pressed.
     """
     await call.message.edit_text(
-        "🎨 **Тема карт**\n\nВыберите внешний вид карт:",
+        "🎨 <b>Тема карт</b>\n\nВыберите внешний вид карт:",
         reply_markup=await get_card_theme_keyboard(call.message.chat)
     )
     await call.answer()
@@ -126,14 +116,8 @@ async def set_card_theme_callback(call: types.CallbackQuery, callback_data: Sett
     Устанавливает выбранную тему карт из callback'а.
     Обновляет запись в базе данных и изменяет клавиатуру, чтобы отразить выбор.
     
-    ИСПРАВЛЕНО: Исправлена ошибка валидации при создании чата.
-    ИСПРАВЛЕНО: Убран лишний вызов edit_reply_markup, который приводил к ошибке, если тема не менялась.
-    
     Sets the chosen card theme from a callback.
     Updates the database record and modifies the keyboard to reflect the choice.
-    
-    FIXED: Fixed validation error during chat creation.
-    FIXED: Removed unnecessary call to edit_reply_markup that caused an error if the theme was not changed.
     """
     new_theme = callback_data.value
     chat = call.message.chat
@@ -144,19 +128,15 @@ async def set_card_theme_callback(call: types.CallbackQuery, callback_data: Sett
     )
     chat_setting, _ = await ChatSetting.get_or_create(chat=db_chat)
 
-    # ИСПРАВЛЕНО: Проверяем, отличается ли новая тема от текущей, чтобы избежать ошибки
-    # FIXED: Check if the new theme is different from the current one to avoid an error
     if chat_setting.card_theme != new_theme:
         chat_setting.card_theme = new_theme
         await chat_setting.save()
         
-        # Обновляем клавиатуру только если тема была изменена
-        # Update the keyboard only if the theme has been changed
         await call.message.edit_reply_markup(
             reply_markup=await get_card_theme_keyboard(chat)
         )
-        await call.answer(f"✅ Тема изменена на {new_theme.capitalize()}")
+        # ИСПРАВЛЕНО: Убрано .capitalize()
+        # FIXED: Removed .capitalize()
+        await call.answer(f"✅ Тема изменена на {new_theme}")
     else:
-        # Если тема та же, просто отвечаем пользователю без редактирования сообщения
-        # If the theme is the same, just answer the user without editing the message
         await call.answer("Эта тема уже установлена")

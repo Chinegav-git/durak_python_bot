@@ -167,8 +167,10 @@ def game_info(game: Game, l: I18n) -> InputTextMessageContent:
     """
     players_info = ''.join(f"\n👤 {len(pl.cards)} 🃏 | {pl.mention}" for pl in game.players)
     
+    # ИСПРАВЛЕНО: Заменены Markdown-кавычки (`) на HTML-теги (<code>) для соответствия parse_mode="HTML".
+    # FIXED: Replaced Markdown backticks (`) with HTML tags (<code>) to match parse_mode="HTML".
     field_info = ''.join(
-        f'\n  `{str(a)}` ◄- `{str(d) if d else "❌"}`'
+        f'\n  <code>{str(a)}</code> ◄- <code>{str(d) if d else "❌"}</code>'
         for a, d in game.field.items()
     )
 
