@@ -17,6 +17,7 @@ as suggestions above the input field. Each result represents a possible
 action (e.g., play a card, draw, pass) or an informational message.
 """
 
+import html
 from typing import List
 from uuid import uuid4
 
@@ -165,7 +166,7 @@ def game_info(game: Game, l: I18n) -> InputTextMessageContent:
     Формирует подробную информацию о текущем состоянии игры.
     Generates detailed information about the current game state.
     """
-    players_info = ''.join(f"\n👤 <code>{len(pl.cards)}</code> 🃏 | {pl.mention}" for pl in game.players)
+    players_info = ''.join(f"\n👤 <code>{len(pl.cards)}</code> 🃏 | {html.escape(pl.mention)}" for pl in game.players)
     
     field_info = ''.join(
         f'\n  <code>{str(a)}</code> ◄- <code>{str(d) if d else "❌"}</code>'
@@ -175,9 +176,9 @@ def game_info(game: Game, l: I18n) -> InputTextMessageContent:
     return InputTextMessageContent(
         message_text=l.t(
             'game.info_text',
-            attacker_mention=game.current_player.mention,
+            attacker_mention=html.escape(game.current_player.mention),
             attacker_cards=len(game.current_player.cards),
-            defender_mention=game.opponent_player.mention,
+            defender_mention=html.escape(game.opponent_player.mention),
             defender_cards=len(game.opponent_player.cards),
             trump_icon=game.deck.trump_ico,
             deck_size=len(game.deck.cards),
