@@ -75,12 +75,15 @@ def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme
     if not sticker_id:
         return
 
+    # ИСПРАВЛЕНО: Заменен player.mention на player.name и принудительно отключен parse_mode.
+    # FIXED: Replaced player.mention with player.name and forcibly disabled parse_mode.
     results.append(
         Sticker(
             id="draw",
             sticker_file_id=sticker_id,
             input_message_content=InputTextMessageContent(
-                message_text=l.t('game.take_action', name=player.mention)
+                message_text=l.t('game.take_action', name=player.name),
+                parse_mode=None
             ),
         )
     )
@@ -95,12 +98,15 @@ def add_pass(game: Game, results: List[InlineQueryResult], theme_name: str, l: I
     if not sticker_id:
         return
 
+    # ИСПРАВЛЕНО: Принудительно отключен parse_mode.
+    # FIXED: Forcibly disabled parse_mode.
     results.append(
         Sticker(
             id="pass",
             sticker_file_id=sticker_id,
             input_message_content=InputTextMessageContent(
-                message_text=l.t('game.pass_action')
+                message_text=l.t('game.pass_action'),
+                parse_mode=None
             ),
         )
     )
@@ -142,24 +148,30 @@ def add_card(
         else:
             message_text = l.t('inline.attack_action', card=str(atk_card))
 
+        # ИСПРАВЛЕНО: Принудительно отключен parse_mode.
+        # FIXED: Forcibly disabled parse_mode.
         results.append(
             Sticker(
                 id=id_,
                 sticker_file_id=sticker_id,
                 input_message_content=InputTextMessageContent(
-                    message_text=message_text
+                    message_text=message_text,
+                    parse_mode=None
                 ),
             )
         )
     else:
         # ИСПРАВЛЕНО: Для неактивных карт используется простое текстовое сообщение.
         # FIXED: A simple text message is used for inactive cards.
+        # ИСПРАВЛЕНО: Принудительно отключен parse_mode.
+        # FIXED: Forcibly disabled parse_mode.
         results.append(
             Sticker(
                 id=str(uuid4()),  # Уникальный ID, чтобы избежать коллизий
                 sticker_file_id=sticker_id,
                 input_message_content=InputTextMessageContent(
-                    message_text=l.t('inline.cannot_play_card')
+                    message_text=l.t('inline.cannot_play_card'),
+                    parse_mode=None
                 )
             )
         )
