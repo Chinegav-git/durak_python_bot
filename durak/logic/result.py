@@ -152,11 +152,15 @@ def add_card(
             )
         )
     else:
+        # ИСПРАВЛЕНО: Для неактивных карт используется простое текстовое сообщение.
+        # FIXED: A simple text message is used for inactive cards.
         results.append(
             Sticker(
                 id=str(uuid4()),  # Уникальный ID, чтобы избежать коллизий
                 sticker_file_id=sticker_id,
-                input_message_content=game_info(game, l)  # Показываем общую инфу
+                input_message_content=InputTextMessageContent(
+                    message_text=l.t('inline.cannot_play_card')
+                )
             )
         )
 
@@ -189,19 +193,19 @@ def game_info(game: Game, l: I18n) -> InputTextMessageContent:
     )
 
 
-def add_gameinfo(game: Game, results: List[InlineQueryResult], theme_name: str, l: I18n):
+def add_gameinfo(game: Game, results: List[InlineQueryResult], l: I18n):
     """
-    Добавляет опцию для отображения информации об игре.
-    Adds an option to display game information.
-    """
-    sticker_id = th.get_sticker_id('info', theme_name)
-    if not sticker_id:
-        return
+    Добавляет опцию для отображения информации об игре в виде статьи.
+    Это исправляет ошибку DOCUMENT_INVALID, так как Sticker не поддерживает HTML.
 
+    Adds an option to display game information as an article.
+    This fixes the DOCUMENT_INVALID error, as Sticker does not support HTML.
+    """
     results.append(
-        Sticker(
+        InlineQueryResultArticle(
             id="gameinfo",
-            sticker_file_id=sticker_id,
+            title=l.t('inline.game_info_title'),
+            description=l.t('inline.game_info_description'),
             input_message_content=game_info(game, l)
         )
     )

@@ -115,7 +115,10 @@
     "my_cards_no_cards": "У вас нет карт!",
     "my_cards_text": "У вас в руке:\n{cards_list}",
     "attack_action": "Атака: {card}",
-    "defend_action": "Защита: {card}"
+    "defend_action": "Защита: {card}",
+    "cannot_play_card": "Этой картой сейчас ходить нельзя.",
+    "game_info_title": "ℹ️ Информация об игре",
+    "game_info_description": "Показывает текущее состояние стола и игроков."
   },
   "errors": {
     "unexpected": "Произошла непредвиденная ошибка при выходе из игры: {error}",

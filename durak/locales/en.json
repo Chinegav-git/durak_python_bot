@@ -49,7 +49,11 @@
     "started_successfully": "🚀 Game has started!",
     "old_button": "This button is no longer relevant.",
     "current_mode": "Current game mode: `{mode}`.",
-    "change_mode": "To change the mode, use the /settings menu."
+    "change_mode": "To change the mode, use the /settings menu.",
+    "info_text": "⚔️ <b>Attack:</b> {attacker_mention}\n🛡️ <b>Defense:</b> {defender_mention}\n\n🃏 <b>Players:</b>{players_info}\n\n<b>Table:</b>{field_info}\n\n♦️ <b>Trump:</b> {trump_icon}\n📇 <b>Deck:</b> {deck_size}",
+    "field_empty": "\n  <i>(empty)</i>",
+    "take_action": "📥 {name} takes cards.",
+    "pass_action": "✅ Pass"
   },
   "round": {
     "start_header": "Round Start",
@@ -111,7 +115,10 @@
     "my_cards_no_cards": "You have no cards!",
     "my_cards_text": "You have in your hand:\n{cards_list}",
     "attack_action": "Attack: {card}",
-    "defend_action": "Defend: {card}"
+    "defend_action": "Defend: {card}",
+    "cannot_play_card": "This card cannot be played right now.",
+    "game_info_title": "ℹ️ Game Info",
+    "game_info_description": "Shows the current state of the table and players."
   },
   "errors": {
     "unexpected": "An unexpected error occurred while leaving the game: {error}",
