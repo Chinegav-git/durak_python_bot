@@ -7,11 +7,11 @@ THEME = {
         'c': 'CAACAgIAAxkBAAEFiF5i9N6ePrpgsVNpA7xD904tUTCjWQACyhoAAlehqUvmgY-dQGLnSikE'
     },
     'SPECIAL': {
-        # ИСПРАВЛЕНО: Заменены невалидные ID стикеров на временные, но рабочие.
-        # FIXED: Replaced invalid sticker IDs with temporary but working ones.
-        'draw': 'CAACAgIAAxkBAAEFiFhi9N6WsmoVGiVCARK0PaEPy1hxIwACEh4AAnTOqEtb-7pItmYVoSkE', # TEMP
-        'info': 'CAACAgIAAxkBAAEFiFpi9N6Zq1VuvqptUTttNQv3aAre9gACSxoAAgnnqEvn34S0p9V4fSkE', # TEMP
-        'pass': 'CAACAgIAAxkBAAEFiFxi9N6bYVzGDq8wbRH75_4ZblK7sAACchkAAiZkqEuIdmKBktgSYikE', # TEMP
+        # ИСПРАВЛЕНО: Заменены невалидные ID стикеров на ID карты 6♦️ в качестве временной меры.
+        # FIXED: Replaced invalid sticker IDs with the ID of the 6♦️ card as a temporary measure.
+        'draw': 'CAACAgIAAxkBAAEFh7pi9NRDcCPWuNKz0LC62J3TM7CGaAACSBkAAt0vkEtZKUcC8YvNVSkE', # TEMP
+        'info': 'CAACAgIAAxkBAAEFiFpi9N6Zq1VuvqptUTttNQv3aAre9gACSxoAAgnnqEvn34S0p9V4fSkE', # TEMP (unused)
+        'pass': 'CAACAgIAAxkBAAEFh7pi9NRDcCPWuNKz0LC62J3TM7CGaAACSBkAAt0vkEtZKUcC8YvNVSkE', # TEMP
     },
     'normal': {
 
