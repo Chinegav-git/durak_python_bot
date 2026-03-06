@@ -24,11 +24,10 @@ from uuid import uuid4
 from aiogram.types import (
     InlineQueryResult,
     InlineQueryResultArticle,
-    InlineQueryResultCachedSticker as Sticker,
     InputTextMessageContent,
 )
 
-from ..objects import Card, Game, Player, theme as th
+from ..objects import Card, Game, Player
 from ..utils.i18n import I18n
 
 
@@ -68,19 +67,14 @@ def add_not_started(results: List[InlineQueryResult], l: I18n):
 
 def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme_name: str, l: I18n):
     """
-    Добавляет опцию "Взять карты" в виде стикера.
-    Adds a "Draw cards" option as a sticker.
+    Добавляет опцию "Взять карты" в виде статьи.
+    Adds a "Draw cards" option as an article.
     """
-    sticker_id = th.get_sticker_id('draw', theme_name)
-    if not sticker_id:
-        return
-
-    # ИСПРАВЛЕНО: Заменен player.mention на player.name и принудительно отключен parse_mode.
-    # FIXED: Replaced player.mention with player.name and forcibly disabled parse_mode.
     results.append(
-        Sticker(
+        InlineQueryResultArticle(
             id="draw",
-            sticker_file_id=sticker_id,
+            title=l.t('game.take_action_title'),
+            description=l.t('game.take_action_description'),
             input_message_content=InputTextMessageContent(
                 message_text=l.t('game.take_action', name=player.name),
                 parse_mode=None
@@ -91,19 +85,14 @@ def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme
 
 def add_pass(game: Game, results: List[InlineQueryResult], theme_name: str, l: I18n):
     """
-    Добавляет опцию "Пас" в виде стикера.
-    Adds a "Pass" option as a sticker.
+    Добавляет опцию "Пас" в виде статьи.
+    Adds a "Pass" option as an article.
     """
-    sticker_id = th.get_sticker_id('pass', theme_name)
-    if not sticker_id:
-        return
-
-    # ИСПРАВЛЕНО: Принудительно отключен parse_mode.
-    # FIXED: Forcibly disabled parse_mode.
     results.append(
-        Sticker(
+        InlineQueryResultArticle(
             id="pass",
-            sticker_file_id=sticker_id,
+            title=l.t('game.pass_action_title'),
+            description=l.t('game.pass_action_description'),
             input_message_content=InputTextMessageContent(
                 message_text=l.t('game.pass_action'),
                 parse_mode=None
@@ -122,21 +111,10 @@ def add_card(
     def_card: Card = None,
 ):
     """
-    Добавляет опцию, представляющую собой игральную карту.
-    Adds an option representing a playing card.
+    Добавляет опцию, представляющую собой игральную карту, в виде статьи.
+    Adds an option representing a playing card as an article.
     """
     card_to_show = def_card or atk_card
-    is_trump = card_to_show.suit == game.trump
-
-    style = 'grey'
-    if can_play:
-        style = 'trump_normal' if is_trump else 'normal'
-    else:
-        style = 'trump_grey' if is_trump else 'grey'
-
-    sticker_id = th.get_sticker_id(repr(card_to_show), theme_name, style=style)
-    if not sticker_id:
-        return
 
     id_ = repr(atk_card)
     if def_card:
@@ -145,15 +123,18 @@ def add_card(
     if can_play:
         if def_card:
             message_text = l.t('inline.defend_action', card=str(def_card))
+            title = l.t('inline.defend_title', card=str(def_card))
+            description = l.t('inline.defend_description', card=str(atk_card))
         else:
             message_text = l.t('inline.attack_action', card=str(atk_card))
-
-        # ИСПРАВЛЕНО: Принудительно отключен parse_mode.
-        # FIXED: Forcibly disabled parse_mode.
+            title = l.t('inline.attack_title', card=str(atk_card))
+            description = l.t('inline.attack_description')
+        
         results.append(
-            Sticker(
+            InlineQueryResultArticle(
                 id=id_,
-                sticker_file_id=sticker_id,
+                title=title,
+                description=description,
                 input_message_content=InputTextMessageContent(
                     message_text=message_text,
                     parse_mode=None
@@ -161,14 +142,11 @@ def add_card(
             )
         )
     else:
-        # ИСПРАВЛЕНО: Для неактивных карт используется простое текстовое сообщение.
-        # FIXED: A simple text message is used for inactive cards.
-        # ИСПРАВЛЕНО: Принудительно отключен parse_mode.
-        # FIXED: Forcibly disabled parse_mode.
         results.append(
-            Sticker(
+            InlineQueryResultArticle(
                 id=str(uuid4()),  # Уникальный ID, чтобы избежать коллизий
-                sticker_file_id=sticker_id,
+                title=l.t('inline.cannot_play_title', card=str(card_to_show)),
+                description=l.t('inline.cannot_play_description'),
                 input_message_content=InputTextMessageContent(
                     message_text=l.t('inline.cannot_play_card'),
                     parse_mode=None
