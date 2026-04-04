@@ -8,57 +8,70 @@ from durak.logic import result as r
 from durak.db.chat_settings import get_chat_settings
 
 def get_player_for_user(user: types.User) -> Optional[Player]:
-    """Finds the player object for a given user across all active games."""
+    """Находит игрока во всех активных играх Дурака."""
     for game in gm.games.values():
         for player in game.players:
             if player.user.id == user.id:
                 return player
     return None
 
-
 @dp.inline_handler()
 async def inline_handler(query: types.InlineQuery):
-    """ Inline handler :> """
+    # --- БЛОК МЕМОВ ---
+    if query.query.startswith('meme'):
+        from durak.db.meme_models import MemeSession, MemeEntry
+        with db_session:
+            # Ищем запись игрока в активном раунде сбора мемов
+            entry = MemeEntry.get(player_id=query.from_user.id, session__status='gathering')
+            
+            if not entry:
+                return await query.answer([], switch_pm_text="Ви не в грі або раунд ще не почався!", switch_pm_parameter="join")
+
+            hand_stickers = entry.hand.split(",")
+            
+            results = [
+                types.InlineQueryResultCachedSticker(
+                    id=f"meme_{i}", 
+                    sticker_file_id=s_id
+                )
+                for i, s_id in enumerate(hand_stickers)
+            ]
+            return await query.answer(results, cache_time=1, is_personal=True)
+    # ------------------
+
+    """ Стандартный инлайн Дурака """
     user = types.User.get_current()
     text = query.query or ''
     player = get_player_for_user(user)
     result: List[types.InlineQueryResult] = []
 
     if player is None:
-        # not playing
         r.add_no_game(result)
     else:
         game = player.game
-        
         if not game.started:
-            # game not started
             r.add_not_started(result)
         else:
             chat_settings = get_chat_settings(game.id)
             theme_name = chat_settings.card_theme if chat_settings else 'classic'
             
-            playable = []  # playable cards
-
+            playable = []
             if player in {game.current_player}:
-                # player is ATK
                 if not game.is_pass:
                     r.add_pass(result, game, theme_name)
                 playable = player.playable_card_atk()
-                
-                sorted_cards = sorted(player.cards)
-                for card_ in sorted_cards:
+                for card_ in sorted(player.cards):
                     r.add_card(game, card_, result, (card_ in playable), theme_name)
                 
             elif player == game.opponent_player:
-                # player is DEF
                 if game.field and not game.all_beaten_cards:
                     r.add_draw(player, result, theme_name)
                 
                 atk_card = None
                 try:
-                    atk_card = c.from_str(text)
-                except ValueError:
-                    pass
+                    # Убедись, что 'Card' доступен в этом файле
+                    atk_card = Card.from_str(text) 
+                except: pass
 
                 if atk_card is None:
                     for atk in game.attacking_cards:
@@ -67,26 +80,20 @@ async def inline_handler(query: types.InlineQuery):
                             break
                 
                 if atk_card is None or atk_card not in game.attacking_cards or game.field.get(atk_card) is not None:
-                    sorted_cards = sorted(player.cards)
-                    for card_ in sorted_cards:
+                    for card_ in sorted(player.cards):
                         r.add_card(game, card_, result, False, theme_name)
                 else:
                     playable = player.playable_card_def(atk_card)
-                    
-                    sorted_cards = sorted(player.cards)
-                    for card_ in sorted_cards:
+                    for card_ in sorted(player.cards):
                         r.add_card(game, atk_card, result, (card_ in playable), theme_name, def_card=card_)
-
             else:
-                # Support player
                 playable = player.playable_card_atk()
-                
-                sorted_cards = sorted(player.cards)
-                for card_ in sorted_cards:
+                for card_ in sorted(player.cards):
                     r.add_card(game, card_, result, (card_ in playable), theme_name)
 
             r.add_gameinfo(game, result, theme_name)
 
+        # Безопасное добавление ID анти-чита (только если игрок найден)
         for res in result:
             res.id += ':%d' % player.anti_cheat
 

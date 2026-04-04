@@ -12,14 +12,26 @@ dp = Dispatcher(bot)
 
 # 3. GameManager
 gm = GameManager()
-gm.set_bot(bot)  # Передаем экземпляр бота в GameManager
-#Commands = COMMANDS
+gm.set_bot(bot)
+
+# --- ВАЖНЫЙ БЛОК: ИМПОРТ ВСЕХ МОДЕЛЕЙ ПЕРЕД ГЕНЕРАЦИЕЙ МАППИНГА ---
+# Импортируем стандартные настройки (UserSetting, ChatSetting)
+from durak.db import user_settings, chat_settings
+# Импортируем новые модели для игры в мемы
+from durak.db.meme_models import MemeSession, MemeEntry, MemeVote
+# ----------------------------------------------------------------
 
 # Database init
-# Определяем абсолютный путь к файлу базы данных
 db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'durak.sqlite')
-db.bind('sqlite', db_path, create_db=True)
+
+# Привязываем базу данных
+if not db.provider:
+    db.bind('sqlite', db_path, create_db=True)
+
+# Генерируем таблицы. Теперь Pony видит ВСЕ модели (и Дурака, и Меми)
 db.generate_mapping(create_tables=True)
+
 db_session = db
+
 # Button
 CHOISE = [[types.InlineKeyboardButton(text='Вибери карту!', switch_inline_query_current_chat='')]]

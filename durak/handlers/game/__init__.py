@@ -12,3 +12,5 @@ from . import chosing
 from . import process_chosen
 from . import callback_handlers
 from . import test_win
+from . import meme_game
+from . import meme_logic
