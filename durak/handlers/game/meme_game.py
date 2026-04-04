@@ -7,7 +7,6 @@ from pony.orm import db_session, commit, select
 from durak.db.meme_models import MemeSession, MemeEntry
 
 # --- ДОПОМІЖНІ ФУНКЦІЇ ---
-
 def get_random_sit():
     """Вибирає випадкову ситуацію з файлу."""
     try:
@@ -178,3 +177,36 @@ async def handle_sticker_logic(message: types.Message):
     entry.sticker_id = message.sticker.file_id
     commit() # <--- Зберігаємо ПЕРЕД відповіддю бота
     await message.answer(f"✅ Мем від <b>{message.from_user.first_name}</b> прийнято!")
+
+# --- НОВИЙ INLINE HANDLER ---
+@dp.inline_handler(lambda iq: iq.query == "meme")
+@db_session
+async def meme_inline_handler(query: types.InlineQuery):
+    """
+    Відповідає на інлайн-запит "meme", показуючи гравцю його карти (стікери).
+    Inline-запити не мають контексту чату, тому для пошуку гри використовується
+    ID користувача. Це може призвести до некоректної поведінки, якщо
+    користувач грає в кількох чатах одночасно.
+    """
+    user_id = query.from_user.id
+    
+    # Шукаємо останню активну гру, де гравець не вилетів.
+    entry = select(
+        e for e in MemeEntry if e.player_id == user_id and e.session.status == 'gathering' and not e.is_out
+    ).order_by(lambda e: e.session.id).first()
+
+    if not entry or not entry.hand:
+        return await query.answer([], cache_time=1, is_personal=True,
+                                  switch_pm_text="Не вдалося знайти вашу руку в активній грі.",
+                                  switch_pm_parameter="start")
+
+    hand_list = entry.hand.split(',')
+    
+    results = []
+    for i, sticker_id in enumerate(hand_list):
+        results.append(types.InlineQueryResultCachedSticker(
+            id=str(i), # ID результату має бути унікальним string
+            sticker_file_id=sticker_id
+        ))
+        
+    await query.answer(results, is_personal=True, cache_time=1)
