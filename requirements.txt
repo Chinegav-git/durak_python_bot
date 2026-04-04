@@ -1,14 +1,21 @@
-# Core bot framework
-aiogram==3.7.0
+aiogram==2.25.1
+aiohttp==3.8.6
+aiosignal==1.4.0
+async-timeout==4.0.3
+attrs==25.4.0
+Babel==2.9.1
+certifi==2026.1.4
+charset-normalizer==3.4.4
+environs==9.5.0
+frozenlist==1.8.0
+idna==3.11
 magic-filter==1.0.12
-
-# Database
-tortoise-orm>=0.21.0
-aerich==0.7.2
-asyncpg==0.29.0
-
-# State management
-redis==5.0.7
-
-# Configuration
-environs[dotenv]==11.0.0
+marshmallow==3.19.0
+multidict==6.7.1
+packaging==26.0
+pony==0.7.19
+propcache==0.4.1
+python-dotenv==1.2.1
+pytz==2025.2
+typing_extensions==4.15.0
+yarl==1.22.0

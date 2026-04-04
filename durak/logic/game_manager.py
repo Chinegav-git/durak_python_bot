@@ -1,320 +1,190 @@
-# -*- coding: utf-8 -*-
-"""
-Менеджер игровых сессий (GameManager).
+import asyncio
+from ..objects import *
+from ..db import UserSetting, ChatSetting
+from pony.orm import db_session
 
-Этот класс является центральным узлом для управления всеми активными играми в боте.
-Он абстрагирует логику хранения, получения и управления жизненным циклом игровых
-объектов (`Game`).
+from aiogram import types, Bot
+from typing import Dict, List, Union
 
-Основные обязанности:
-- **Хранение:** Сериализует объекты `Game` с помощью `pickle` и сохраняет их в Redis.
-  Это обеспечивает быстрое сохранение и загрузку состояния между ходами.
-- **Жизненный цикл:** Предоставляет методы для создания (`new_game`), получения
-  (`get_game_from_chat`), завершения (`end_game`) и сохранения (`save_game`) игр.
-- **Управление игроками:** Обрабатывает присоединение (`join_in_game`) и выход
-  (`leave_game`) игроков, управляя их связью с конкретной игровой сессией.
-- **Блокировки:** Использует Redis для установки блокировок, предотвращая создание
-  нескольких игр в одном чате или участие одного пользователя в нескольких играх.
-- **Взаимодействие с БД:** Обновляет флаг `is_game_active` в модели `ChatSetting`,
-  чтобы отразить наличие активной игры в чате.
-
--------------------------------------------------------------------------------------
-
-Game Session Manager (GameManager).
-
-This class is the central hub for managing all active games in the bot.
-It abstracts the logic for storing, retrieving, and managing the lifecycle of game
-objects (`Game`).
-
-Key Responsibilities:
-- **Storage:** Serializes `Game` objects using `pickle` and stores them in Redis.
-  This ensures fast state saving and loading between turns.
-- **Lifecycle:** Provides methods for creating (`new_game`), retrieving
-  (`get_game_from_chat`), ending (`end_game`), and saving (`save_game`) games.
-- **Player Management:** Handles players joining (`join_in_game`) and leaving
-  (`leave_game`), managing their association with a specific game session.
-- **Locking:** Uses Redis to set locks, preventing the creation of multiple games
-  in one chat or a single user participating in multiple games.
-- **DB Interaction:** Updates the `is_game_active` flag in the `ChatSetting` model
-  to reflect the presence of an active game in a chat.
-"""
-
-import pickle
-from contextlib import suppress
-from typing import List, Optional, Union
-
-from aiogram import Bot, types
-from redis.asyncio import Redis
-
-from ..db.models import Chat, ChatSetting, User, UserSetting
-from ..objects.card import Card
-from ..objects.errors import (
-    AlreadyJoinedError,
-    AlreadyJoinedInGlobalError,
-    GameAlreadyInChatError,
-    GameStartedError,
-    LimitPlayersInGameError,
-    LobbyClosedError,
-    NoGameInChatError,
-    NotEnoughPlayersError,
-    GameNotFoundError
-)
-from ..objects.game import Game
-from ..objects.player import Player
+from ..objects.errors import PlayerNotFoundError
 
 
 class GameManager:
-    """Класс для управления игровыми сессиями.
-    
-    Class for managing game sessions.
-    """
+    def __init__(self) -> None:
+        self.games: Dict[int, Game] = dict()
+        self.notify: Dict[int, List[int]] = dict()
+        self.bot: Bot = None
 
-    def __init__(self, bot: Bot, redis: Redis) -> None:
-        self.bot: Bot = bot
-        self.redis: Redis = redis
+    def set_bot(self, bot: Bot):
+        self.bot = bot
 
-    def _game_key(self, chat_id: int) -> str:
-        """Возвращает ключ для хранения игры в Redis.
-        
-        Returns the Redis key for storing a game.
-        """
-        return f"game:{chat_id}"
+    # --- DB-related private methods ---
 
-    def _user_game_key(self, user_id: int) -> str:
-        """Возвращает ключ для отслеживания игры пользователя в Redis.
-        
-        Returns the Redis key for tracking a user's game.
-        """
-        return f"user_game:{user_id}"
+    @db_session
+    def _new_game_db_session(self, chat_id: int, user_id: int):
+        """Synchronously handles DB operations for new game creation."""
+        chat_setting = ChatSetting.get_or_create(chat_id)
+        if chat_setting.is_game_active:
+            chat_setting.is_game_active = False # Reset in case of zombie game
+        chat_setting.is_game_active = True
+        self._update_user_playing_status_db_session([user_id], True)
 
-    async def _serialize_game(self, game: Game) -> bytes:
-        """Сериализует объект игры в байты для Redis.
-        
-        Serializes a game object into bytes for Redis.
-        """
-        return pickle.dumps(game)
+    @db_session
+    def _end_game_db_session(self, chat_id: int, players: List[Player]):
+        """Synchronously handles DB operations for ending a game."""
+        chat_setting = ChatSetting.get(id=chat_id)
+        if chat_setting:
+            chat_setting.is_game_active = False
 
-    async def _deserialize_game(self, data: bytes) -> Game:
-        """Десериализует объект игры из байтов.
-        
-        Deserializes a game object from bytes.
-        """
-        return pickle.loads(data)
+        player_ids = [p.user.id for p in players]
+        self._update_user_playing_status_db_session(player_ids, False)
 
-    async def _update_stats_on_game_end(self, game: Game):
-        """
-        Обновляет статистику игроков по окончании игры.
-        Updates player statistics at the end of a game.
-        """
-        loser_id = game.durak.id if game.durak else None
+        for pl in players:
+            us = UserSetting.get_or_create(pl.user.id)
+            if us.stats:
+                us.games_played += 1
 
-        for player in game.players:
-            # Убедимся, что игрок существует в БД, чтобы избежать ошибок внешнего ключа
-            # Ensure the player exists in the DB to avoid foreign key errors
-            await User.get_or_create(
-                id=player.id, 
-                defaults={
-                    'first_name': player.first_name, 
-                    'username': player.username
-                }
-            )
-            us, _ = await UserSetting.get_or_create(user_id=player.id)
-            if not us.stats_enabled:
-                continue
+    @db_session
+    def _check_user_in_game_db_session(self, user_id: int) -> bool:
+        """Checks if a user is marked as playing in the database."""
+        user_setting = UserSetting.get(id=user_id)
+        return user_setting and user_setting.is_playing
 
-            us.games_played += 1
-            if player.id != loser_id:
-                us.wins += 1
-            
-            await us.save()
+    @db_session
+    def _update_user_playing_status_db_session(self, user_ids: List[int], is_playing: bool):
+        """Updates the is_playing status for a list of users."""
+        for user_id in user_ids:
+            user_setting = UserSetting.get_or_create(user_id)
+            user_setting.is_playing = is_playing
 
-    async def save_game(self, game: Game):
-        """Сохраняет состояние игры в Redis.
-        
-        Saves the game state to Redis.
-        """
-        key = self._game_key(game.id)
-        serialized_game = await self._serialize_game(game)
-        await self.redis.set(key, serialized_game)
+    # --- Game Logic Helpers ---
 
-    async def get_user_game_id(self, user_id: int) -> Optional[int]:
-        """Проверяет, в какой игре находится пользователь.
-        
-        Checks which game a user is in.
-        """
-        game_id = await self.redis.get(self._user_game_key(user_id))
-        return int(game_id) if game_id else None
-
-    async def get_game_by_user_id(self, user_id: int) -> Game:
-        """
-        Находит игру по ID пользователя.
-        Finds a game by user ID.
-        """
-        chat_id = await self.get_user_game_id(user_id)
-        if not chat_id:
-            raise GameNotFoundError(f"User {user_id} is not in any game")
-        
-        try:
-            return await self.get_game_from_chat(chat_id)
-        except NoGameInChatError:
-            await self.redis.delete(self._user_game_key(user_id))
-            raise GameNotFoundError(f"Game in chat {chat_id} not found, stale user lock cleared")
+    def is_user_in_any_game(self, user_id: int) -> bool:
+        """Checks if a user is currently a player in any active, in-memory game."""
+        for game in self.games.values():
+            for player in game.players:
+                if player.user.id == user_id:
+                    return True
+        return False
 
     def get_game_end_message(self, game: Game) -> str:
-        """Генерирует финальное сообщение по окончании игры.
+        """Generates the game over message based on the game's state, matching the old style."""
         
-        Generates the final message at the end of a game.
-        """
         if not game.durak:
-            return '🤝 <b>Игра окончена! Ничья!</b>\n\nВсе игроки закончили игру одновременно.'
+            # Draw case
+            return (
+                '🤝 <b>Гру закінчено! Нічия!</b>\n\n'
+                'Усі гравці закінчили гру одночасно.'
+            )
 
+        # Case with a loser (durak)
         winners = [p for p in game.players if p != game.durak]
         loser = game.durak
-        message_parts = ["🎮 <b>Игра окончена!</b>\n"]
+
+        message_parts = ["🎮 <b>Гру закінчено!</b>\n"]
+
         if winners:
-            message_parts.append("<b>Победители:</b>")
-            message_parts.append("\n".join([f'🏆 {p.mention}' for p in winners]))
+            winners_text = "\n".join([f'🏆 {p.user.get_mention(as_html=True)}' for p in winners])
+            message_parts.append("<b>Переможці:</b>")
+            message_parts.append(winners_text)
+        else:
+            message_parts.append("<b>Переможці:</b>")
+            message_parts.append("Немає")
+        
         if loser:
-            message_parts.append("\n<b>Проигравший:</b>")
-            message_parts.append(f'💔 {loser.mention}')
+            if winners:
+                message_parts.append("") # Add a newline for separation
+            loser_text = f'💔 {loser.user.get_mention(as_html=True)}'
+            message_parts.append("<b>Програв:</b>")
+            message_parts.append(loser_text)
+
         return "\n".join(message_parts)
 
-    async def new_game(self, chat: types.Chat, creator: types.User) -> Game:
-        """Создает новую игру в чате.
-        
-        Creates a new game in a chat.
-        """
-        if await self.redis.exists(self._game_key(chat.id)):
+    # --- Public methods ---
+
+    def new_game(self, chat: types.Chat, creator: types.User) -> Game:
+        if self.games.get(chat.id):
             raise GameAlreadyInChatError
-        if await self.get_user_game_id(creator.id):
+        if self.is_user_in_any_game(creator.id):
             raise AlreadyJoinedInGlobalError
 
-        await Chat.get_or_create(id=chat.id, defaults={'title': chat.title, 'type': chat.type})
-        await User.get_or_create(
-            id=creator.id, 
-            defaults={
-                'first_name': creator.first_name, 
-                'last_name': creator.last_name, 
-                'username': creator.username
-            }
-        )
-
-        cs, _ = await ChatSetting.get_or_create(chat_id=chat.id)
-        cs.is_game_active = True
-        await cs.save()
-        await self.redis.set(self._user_game_key(creator.id), chat.id)
-        
-        # ИЗМЕНЕНО: Используем новый конструктор, соответствующий эталонной логике.
-        # CHANGED: Using the new constructor that matches the reference logic.
+        self._new_game_db_session(chat.id, creator.id)
         game = Game(chat, creator)
-        await self.save_game(game)
+        self.games[chat.id] = game
         return game
 
-    async def get_game_from_chat(self, chat_or_id: Union[types.Chat, int]) -> Game:
-        """Получает игру из чата.
-        
-        Retrieves a game from a chat.
-        """
-        chat_id = chat_or_id if isinstance(chat_or_id, int) else chat_or_id.id
-        serialized_game = await self.redis.get(self._game_key(chat_id))
-        if not serialized_game:
+    def get_game_from_chat(self, chat: types.Chat) -> Game:
+        game = self.games.get(chat.id, None)
+        if game is not None:
+            return game
+        raise NoGameInChatError
+
+    def end_game(self, target: Union[types.Chat, Game]) -> None:
+        chat_id = target.chat.id if isinstance(target, Game) else target.id
+        game = self.games.pop(chat_id, None)
+        if game:
+            players = game.players
+            self._end_game_db_session(chat_id, players)
+        else:
+            # If no game object, at least mark the chat as not having an active game
+            self._end_game_db_session(chat_id, [])
             raise NoGameInChatError
-        
-        try:
-            return await self._deserialize_game(serialized_game)
-        except (pickle.UnpicklingError, AttributeError, EOFError, ImportError) as e:
-            await self.redis.delete(self._game_key(chat_id))
-            raise NoGameInChatError(f"Corrupted game data, deleted: {e}")
 
-    async def end_game(self, target: Union[types.Chat, Game]) -> None:
-        """Завершает игру, удаляя все связанные данные.
-        
-        Ends a game, deleting all related data.
+    async def test_win_game(self, game: Game, winner_id: int):
         """
-        chat_id = target.id if isinstance(target, Game) else target.id
-        game = target if isinstance(target, Game) else await self.get_game_from_chat(chat_id)
-        
-        cs = await ChatSetting.get_or_none(chat_id=chat_id)
-        if cs and cs.is_game_active:
-            cs.is_game_active = False
-            await cs.save()
-
-        await self._update_stats_on_game_end(game)
-
-        player_ids = [p.id for p in game.players]
-        if player_ids:
-            user_keys = [self._user_game_key(pid) for pid in player_ids]
-            await self.redis.delete(*user_keys)
-        
-        await self.redis.delete(self._game_key(chat_id))
-
-    async def leave_game(self, game: Game, player: Player):
-        """Удаляет игрока из игры.
-        
-        Removes a player from a game.
+        Завершує гру та оголошує переможця для тесту.
         """
-        if player not in game.players:
+        if not self.bot:
             return
 
-        game.players.remove(player)
-        await self.redis.delete(self._user_game_key(player.id))
+        winner = game.player_for_id(winner_id)
+        if not winner:
+            raise ValueError("Гравця з таким ID не знайдено в цій грі.")
 
-        if not game.started:
-            await self.save_game(game)
-            return
-
-        # ИЗМЕНЕНО: В новой версии Player.leave() не принимает аргументов.
-        # CHANGED: In the new version, Player.leave() takes no arguments.
-        player.leave()
-        player.finished_game = True
-
-        if len([p for p in game.players if not p.finished_game]) < 2:
-            raise NotEnoughPlayersError("Not enough players to continue")
+        game.started = False
+        game.winner = winner
         
-        await self.save_game(game)
+        losers = [p for p in game.players if p.user.id != winner_id]
 
-    async def join_in_game(self, game: Game, user: types.User) -> None:
-        """Добавляет пользователя в игру.
+        message_parts = ["За командою адміністратора, гру примусово завершено!\n"]
+        message_parts.append("🏆 Переможець:")
+        message_parts.append(f'- <a href="tg://user?id={winner.user.id}">{winner.user.full_name}</a>')
+        
+        if losers:
+            message_parts.append("")
+            message_parts.append("Програвші:")
+            message_parts.extend([f'- <a href="tg://user?id={loser.user.id}">{loser.user.full_name}</a>' for loser in losers])
 
-        Adds a user to a game.
-        """
+        message = "\n".join(message_parts)
+        await self.bot.send_message(game.chat.id, message)
+        await asyncio.to_thread(self.end_game, game)
+
+    def join_in_game(self, game: Game, user: types.User) -> None:
         if game.started:
             raise GameStartedError
         if not game.open:
             raise LobbyClosedError
         if len(game.players) >= game.MAX_PLAYERS:
             raise LimitPlayersInGameError
-        if any(p.id == user.id for p in game.players):
+        if any(p.user.id == user.id for p in game.players):
             raise AlreadyJoinedError
-        if await self.get_user_game_id(user.id):
+        if self.is_user_in_any_game(user.id):
             raise AlreadyJoinedInGlobalError
 
-        await User.get_or_create(
-            id=user.id, 
-            defaults={
-                'first_name': user.first_name, 
-                'last_name': user.last_name, 
-                'username': user.username
-            }
-        )
-
-        await self.redis.set(self._user_game_key(user.id), game.id)
-
-        # ИЗМЕНЕНО: Используем новый конструктор, соответствующий эталонной логике.
-        # CHANGED: Using the new constructor that matches the reference logic.
+        self._update_user_playing_status_db_session([user.id], True)
         player = Player(game, user)
         game.players.append(player)
-        await self.save_game(game)
 
-    async def start_game(self, game: Game) -> None:
-        """Начинает игру.
-        
-        Starts a game.
-        """
+    def start_game(self, game: Game) -> None:
         if game.started:
             raise GameStartedError
         if len(game.players) <= 1:
             raise NotEnoughPlayersError
 
+        # Mitigate the original bug's consequences
+        unique_player_ids = {p.user.id for p in game.players}
+        if len(unique_player_ids) != len(game.players):
+            self.end_game(game)
+            raise Exception("Критична помилка: виявлено дублювання гравців. Гру було скасовано.")
+
         game.start()
-        await self.save_game(game)

@@ -1,479 +1,307 @@
-# -*- coding: utf-8 -*-
-"""
-Модуль игровых действий (контроллер).
-
-Этот модуль является связующим звеном между обработчиками команд Telegram (`handlers`)
-и ядром игровой логики (`objects`). Он содержит `async` функции, которые
-оркестрируют игровой процесс: управляют ходами, обрабатывают действия игроков
-(атака, защита, пас, взять карты), отправляют уведомления в чат и обновляют
-состояние игры через GameManager.
-
-Все функции здесь принимают объект `Game` и `Player` и выполняют определенное
-игровое действие, производя необходимые сайд-эффекты (отправка сообщений, 
-сохранение состояния).
-
--------------------------------------------------------------------------------------
-Game actions module (controller).
-
-This module acts as the link between Telegram command handlers (`handlers`)
-and the core game logic (`objects`). It contains `async` functions that
-orchestrate the gameplay: managing turns, handling player actions
-(attack, defense, pass, draw cards), sending notifications to the chat, and updating
-the game state via the GameManager.
-
-All functions here take a `Game` and `Player` object and perform a specific
-game action, producing the necessary side effects (sending messages,
-saving state).
-"""
 
 import asyncio
-import logging
-from contextlib import suppress
+from aiogram import types, Bot
 
-from aiogram import Bot, types
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-# ИСПРАВЛЕНО (рефакторинг): Удален импорт `CHOISE` и `gm` из устаревшего модуля `loader`.
-# # Глобальный GameManager <-- Старый комментарий сохранен для истории.
-# Зависимость GameManager теперь внедряется через аргументы функций.
-# FIXED (refactoring): Removed `CHOISE` and `gm` import from the deprecated `loader` module.
-# # Global GameManager <-- Old comment saved for history.
-# The GameManager dependency is now injected via function arguments.
-# ИСПРАВЛЕНО: Возвращен импорт UserSetting для логики "Автопаса".
-from ..db.models import Chat, ChatSetting, UserSetting
-from ..handlers.game.game_callback import GameCallback
-from ..logic.game_manager import GameManager
-from ..objects import Card, Game, Player
-# ИСПРАВЛЕНО: `card as c` заменен на `theme as th` для получения стикеров
-from ..objects import theme as th
-from ..objects.errors import NoGameInChatError, NotAllowedMove
-
-logger = logging.getLogger(__name__)
+from loader import gm, CHOISE
+from ..db import ChatSetting, UserSetting, session
+from ..objects import *
+from ..objects import card as c
 
 
-async def _delete_message_after_delay(chat_id: int, message_id: int, delay: int, bot: Bot):
-    """
-    Асинхронно удаляет сообщение через указанное количество секунд.
-    Используется для удаления временных уведомлений (например, "пас").
-    
-    Asynchronously deletes a message after a specified number of seconds.
-    Used for deleting temporary notifications (e.g., "pass").
-    """
+class NotEnoughPlayersError(Exception):
+    """Not enough players to continue the game."""
+    pass
+
+
+async def _delete_message_after_delay(chat_id: int, message_id: int, delay: int):
+    """Deletes a message after a specified delay."""
     await asyncio.sleep(delay)
     try:
+        bot = Bot.get_current()
         await bot.delete_message(chat_id, message_id)
     except Exception:
-        # Ошибки игнорируются, так как сообщение могло быть уже удалено
-        # Errors are ignored, as the message might have already been deleted
         pass
 
 
-async def send_turn_notification(game: Game, bot: Bot):
-    """
-    Отправляет в чат уведомление о смене хода.
-    
-    Sends a turn change notification to the chat.
-    """
+async def send_turn_notification(game: Game):
+    """ Sends notification for a normal turn change ('Бито'). """
+    bot = Bot.get_current()
     attacker = game.current_player
     defender = game.opponent_player
     if not defender:
         return
 
-    # ИСПРАВЛЕНО (рефакторинг): Клавиатура-заглушка CHOISE заменена на динамическую
-    # с использованием InlineKeyboardBuilder и GameCallback для консистентности.
-    # FIXED (refactoring): The CHOISE placeholder keyboard has been replaced with a dynamic one
-    # using InlineKeyboardBuilder and GameCallback for consistency.
-    from durak.utils.i18n import t
-    builder = InlineKeyboardBuilder()
-    builder.button(text=t('buttons.my_cards'), switch_inline_query_current_chat='')
-    builder.adjust(1)
+    text = (
+        f'✅ <b>Перехід ходу</b>\n\n'
+        f'⚔️ Атакує: {attacker.user.get_mention(as_html=True)} (🃏{len(attacker.cards)})\n'
+        f'🛡️ Захищається: {defender.user.get_mention(as_html=True)} (🃏{len(defender.cards)})\n\n'
+        f'🃏 Козир: {game.deck.trump_ico}\n'
+        f'🃏 В колоді: {len(game.deck.cards)} карт'
+    )
+    reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
+    await bot.send_message(game.chat.id, text, reply_markup=reply_markup)
+
+
+async def send_no_more_attacks_notification(game: Game):
+    """
+    Sends a notification that no more cards can be thrown in the current round.
+    This is used in games with 3 or more players.
+    """
+    bot = Bot.get_current()
+    defender = game.opponent_player
+    if not defender:
+        return
+
+    # The main attacker is always the first in the list of round attackers
+    main_attacker = game.round_attackers[0]
+    
+    # Other attackers are all subsequent unique players in the list
+    support_attackers = []
+    seen_attackers = set()
+    for player in game.round_attackers[1:]:
+        if player.user.id not in seen_attackers:
+            support_attackers.append(player)
+            seen_attackers.add(player.user.id)
 
     text = (
-        f'✅ <b>Переход хода</b>\n\n'
-        f'⚔️ Атакует: {attacker.mention} (🃏{len(attacker.cards)})\n'
-        f'🛡️ Защищается: {defender.mention} (🃏{len(defender.cards)})\n\n'
-        f'🃏 Козырь: {game.deck.trump_ico}\n'
-        f'🃏 В колоде: {len(game.deck.cards)} карт\n\n'
-        f'🎯 <b>Карты на столе:</b>\n'
+        f"🛡️ {defender.user.get_mention(as_html=True)} відбив(ла) усі карти.\n"
+        f"🔄 Більше підкидати не можна.\n\n"
+        f"⚔️ Атакував(ла): {main_attacker.user.get_mention(as_html=True)}"
     )
-    
-    # Добавляем отображение карт на столе
-    if game.field:
-        table_text = ""
-        for atk_card, def_card in game.field.items():
-            table_text += f'⚔️ {str(atk_card)}'
-            if def_card:
-                table_text += f' 🛡️ {str(def_card)}'
-            else:
-                table_text += ' (не побита)'
-            table_text += '\n'
-        text += table_text
-    await bot.send_message(game.id, text, reply_markup=builder.as_markup())
 
-
-async def send_no_more_attacks_notification(game: Game, bot: Bot):
-    """
-    Отправляет уведомление о том, что защитник отбился и больше подкидывать нельзя.
-
-    Sends a notification that the defender has successfully defended and no more attacks are allowed.
-    """
-    defender = game.opponent_player
-    if not defender or not game.round_attackers:
-        return
-
-    # Собираем всех, кто атаковал в этом раунде
-    main_attacker = game.round_attackers[0]
-    support_attackers = list(set(game.round_attackers[1:]))
-
-    text = f"🛡️ {defender.mention} отбил(а) все карты.\n🔄 Больше подкидывать нельзя.\n\n⚔️ Атаковал(а): {main_attacker.mention}"
     if support_attackers:
-        support_mentions = ', '.join([p.mention for p in support_attackers])
-        text += f"\n↪️ Подкидывал(и): {support_mentions}"
+        support_mentions = ', '.join([p.user.get_mention(as_html=True) for p in support_attackers])
+        text += f"\n↪️ Підкидував(ли): {support_mentions}"
 
-    msg = await bot.send_message(game.id, text)
+    msg = await bot.send_message(game.chat.id, text)
     if msg:
-        # Удаляем это сообщение через 10 секунд
-        asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 10, bot))
+        asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 10))
 
-#
-# ИСПРАВЛЕНО: Функционал статистики временно удален, так как он был основан
-# на устаревшей и нерабочей модели UserSetting. Его нужно будет переписать с нуля.
-#
-# async def _update_win_stats(user_id: int): ...
 
-async def win(game: Game, player: Player, gm: GameManager, bot: Bot):
-    """
-    Обрабатывает победу игрока. Отправляет сообщение и сохраняет победителя.
-    ИСПРАВЛЕНО: Удалена проверка `hasattr`, так как `game.winners` теперь всегда существует.
+async def win(game: Game, player: Player):
+    chat = game.chat
+    bot = Bot.get_current()
 
-    Handles a player's victory. Sends a message and saves the winner.
-    FIXED: Removed `hasattr` check, as `game.winners` now always exists.
-    """
-    # await _update_win_stats(player.id) # Статистика временно отключена
+    with session:
+        user = player.user
+        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
+        if us.stats:
+            us.first_places += 1
+    
+    if not hasattr(game, 'winners'):
+        game.winners = []
 
+    if not game.winner:
+        game.winner = player
+        await bot.send_message(chat.id, f'🏆 {player.user.get_mention(as_html=True)} - переможець!')
+    else:
+        await bot.send_message(chat.id, f'🎉 {player.user.get_mention(as_html=True)} - теж перемагає!')
+    
     if player not in game.winners:
-        if not game.winner:
-            game.winner = player
-            await bot.send_message(game.id, f'🏆 {player.mention} - победитель!')
-        else:
-            # Последующие игроки, у которых кончились карты
-            await bot.send_message(game.id, f'🎉 {player.mention} - тоже побеждает!')
         game.winners.append(player)
-    
-    await gm.save_game(game)
 
 
-async def do_turn(game: Game, gm: GameManager, bot: Bot, skip_def: bool = False):
-    """
-    Выполняет переход хода. Проверяет, не окончена ли игра или не вышел ли кто-то.
-    Если игра окончена, отправляет итоговое сообщение. В противном случае - передает ход.
+async def do_turn(game: Game, skip_def: bool = False):
+    chat = game.chat
     
-    Executes a turn transition. Checks if the game is over or if someone has left.
-    If the game is over, sends the final message. Otherwise, passes the turn.
-    """
     while True:
-        # 1. Проверка на завершение игры
         if game.game_is_over:
-            with suppress(NoGameInChatError):
-                if await gm.get_game_from_chat(game.id):
-                    final_text = gm.get_game_end_message(game)
-                    await gm.end_game(game)
-                    await bot.send_message(game.id, final_text, reply_markup=types.ReplyKeyboardRemove())
+            if gm.get_game_from_chat(chat):
+                final_text = gm.get_game_end_message(game)
+                gm.end_game(game.chat)
+                await Bot.get_current().send_message(chat.id, final_text, reply_markup=types.ReplyKeyboardRemove())
             return
 
-        # 2. Проверка, не вышли ли игроки (если у них кончились карты)
         player_has_left = False
-        for player in list(game.players):
-            if not player.cards and not player.finished_game:
-                await win(game, player, gm, bot)
-                player.finished_game = True
-                player_has_left = True
+        active_players = [p for p in game.players if not p.finished_game]
+        
+        if len(active_players) > 1:
+            for player in list(game.players):
+                if not player.cards and not player.finished_game:
+                    await win(game, player)
+                    player.finished_game = True
+                    player_has_left = True
 
         if player_has_left:
-            continue  # Повторяем цикл, чтобы проверить, не закончилась ли игра
+            # Immediately re-check if the game is over after a player has won
+            if game.game_is_over:
+                if gm.get_game_from_chat(chat):
+                    final_text = gm.get_game_end_message(game)
+                    gm.end_game(game.chat)
+                    await Bot.get_current().send_message(chat.id, final_text, reply_markup=types.ReplyKeyboardRemove())
+                return
+            continue
         else:
-            break  # Все на месте, выходим из цикла
+            break
 
-    # 3. Передаем ход и сохраняем состояние
     game.turn(skip_def=skip_def)
-    await gm.save_game(game)
-
-    # 4. Уведомляем игроков о новом ходе
     if not skip_def:
-        await send_turn_notification(game, bot)
+        await send_turn_notification(game)
 
 
-async def do_leave_player(game: Game, player: Player, gm: GameManager, bot: Bot, from_turn: bool = False):
-    """
-    Обрабатывает выход игрока из игры.
-    
-    Processes a player leaving the game.
-    """
-    await gm.leave_game(game, player)
-
+async def do_leave_player(player: Player, from_turn: bool = False):
+    game = player.game
     if not game.started:
+        if player in game.players:
+            game.players.remove(player)
         return
 
-    if not from_turn:
-        was_defender = (game.opponent_player and player.id == game.opponent_player.id)
-        await do_turn(game, gm, bot, skip_def=was_defender)
-
-
-async def do_pass(game: Game, player: Player, gm: GameManager, bot: Bot):
-    """
-    Обрабатывает действие "Пас" от атакующего игрока.
+    with session:
+        user = player.user
+        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
+        if us.stats:
+            us.games_played += 1
     
-    Handles the "Pass" action from an attacking player.
-    """
+    if not from_turn:
+        was_defender = (game.opponent_player and player.user.id == game.opponent_player.user.id)
+        player.finished_game = True
+        if len([p for p in game.players if not p.finished_game]) < 2:
+            raise NotEnoughPlayersError("Not enough players to continue")
+        await do_turn(game, skip_def=was_defender)
+
+async def do_pass(player: Player):
+    game = player.game
+    bot = Bot.get_current()
+
     if player != game.current_player:
         return
 
     game.is_pass = True
-    await gm.save_game(game)
     
-    # bot должен передаваться как параметр
-    # bot = Bot.get_current()  # Этот метод не существует в aiogram 3.x
-    msg = await bot.send_message(game.id, f"Пас! {player.first_name} больше не подкидает в этом раунде.")
+    msg = await bot.send_message(
+        game.chat.id,
+        f"Пас! {player.user.get_mention(as_html=True)} більше не підкидає в цьому раунді."
+    )
     if msg:
-        asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 7, bot))
+        asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 7))
 
-    # Если все карты на поле побиты, и кто-то сказал "пас", ход завершается
     if game.all_beaten_cards:
-        await do_turn(game, gm, bot)
+        await do_turn(game)
 
 
-async def do_draw(game: Game, player: Player, gm: GameManager, bot: Bot):
-    """
-    Обрабатывает действие "Взять" от защищающегося игрока.
-    Игрок забирает все карты с поля, и ход остается у атакующих.
-    
-    Handles the "Draw" action from the defending player.
-    The player takes all cards from the field, and the turn remains with the attackers.
-    """
-    if not game.opponent_player or player.id != game.opponent_player.id:
-        return
+async def do_draw(player: Player):
+    game = player.game
+    bot = Bot.get_current()
 
-    # Удаляем старые сообщения-кнопки и стикеры карт
     for msg_id in list(game.attack_announce_message_ids.values()):
-        with suppress(Exception): await bot.delete_message(game.id, msg_id)
+        try:
+            await bot.delete_message(game.chat.id, msg_id)
+        except Exception:
+            pass
     game.attack_announce_message_ids.clear()
 
     for sticker_id in list(game.attack_sticker_message_ids.values()):
-        with suppress(Exception): await bot.delete_message(game.id, sticker_id)
+        try:
+            await bot.delete_message(game.chat.id, sticker_id)
+        except Exception:
+            pass
     game.attack_sticker_message_ids.clear()
     
     taking_player = game.opponent_player
-    game.take_all_field() # Ключевая логика - игрок берет карты
-    await do_turn(game, gm, bot, skip_def=True) # Переход хода без смены защитника
+    game.take_all_field()
+    await do_turn(game, skip_def=True)
 
     attacker = game.current_player
     defender = game.opponent_player
     
-    # Уведомление о том, что игрок взял карты
-    from durak.utils.i18n import t
-    builder = InlineKeyboardBuilder()
-    builder.button(text=t('buttons.my_cards'), switch_inline_query_current_chat='')
-    builder.adjust(1)
-    
     text = (
-        f'↪️ <b>Ход остается</b>\n\n'
-        f'🫳 {taking_player.mention} берет карты.\n'
-        f'⚔️ Атакует: {attacker.mention} (🃏{len(attacker.cards)})\n'
-        f'🛡️ Защищается: {defender.mention} (🃏{len(defender.cards)})\n\n'
-        f'🃏 Козырь: {game.deck.trump_ico}\n'
-        f'🃏 В колоде: {len(game.deck.cards)} карт'
+        f'↪️ <b>Хід залишається</b>\n\n'
+        f'🫳 {taking_player.user.get_mention(as_html=True)} бере карти.\n'
+        f'⚔️ Атакує: {attacker.user.get_mention(as_html=True)} (🃏{len(attacker.cards)})\n'
+        f'🛡️ Захищається: {defender.user.get_mention(as_html=True)} (🃏{len(defender.cards)})\n\n'
+        f'🃏 Козир: {game.deck.trump_ico}\n'
+        f'🃏 В колоді: {len(game.deck.cards)} карт'
     )
-    await bot.send_message(game.id, text, reply_markup=builder.as_markup())
+    reply_markup = types.InlineKeyboardMarkup(inline_keyboard=CHOISE)
+    await bot.send_message(game.chat.id, text, reply_markup=reply_markup)
 
 
-async def _get_attack_settings(chat_id: int):
-    """
-    Получает настройки чата, необходимые для атаки (режим отображения, тема карт).
-    ИСПРАВЛЕНО: Удалена нерабочая логика статистики.
-    ДОБАВЛЕНО: Конвертация старых значений режимов в новые.
+async def do_attack_card(player: Player, card: Card):
+    game = player.game
+    user = player.user
+    bot = Bot.get_current()
 
-    Gets the chat settings required for an attack (display mode, card theme).
-    FIXED: Removed non-functional statistics logic.
-    ADDED: Conversion of old mode values to new ones.
-    """
-    chat, _ = await Chat.get_or_create(id=chat_id)
-    cs, _ = await ChatSetting.get_or_create(chat=chat)
-    
-    # Конвертация старых значений в новые для обратной совместимости
-    # Convert old values to new ones for backward compatibility
-    game_mode = cs.game_mode
-    if game_mode == 'p':  # старое значение "картинки"
-        game_mode = 'sticker_and_button'
-    elif game_mode == 't':  # старое значение "текст"
-        game_mode = 'text'
-    
-    return game_mode, cs.card_theme
+    with session:
+        cs = ChatSetting.get(id=game.chat.id)
+        display_mode = cs.display_mode if cs else 'text'
+        theme_name = cs.card_theme if cs else 'classic'
+        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
+        if us.stats:
+            us.cards_atack += 1
 
-
-async def _update_attack_stats(user_id: int):
-    """
-    Обновляет статистику атаки для пользователя.
-    Updates attack statistics for a user.
-    """
-    us, _ = await UserSetting.get_or_create(user_id=user_id)
-    if us.stats_enabled:
-        us.cards_played += 1
-        us.cards_attack += 1
-        await us.save()
-
-
-async def do_attack_card(game: Game, player: Player, card: Card, gm: GameManager, bot: Bot):
-    """
-    Обрабатывает ход атакующей картой.
-    
-    Handles an attacking card move.
-    """
-    try:
-        player.play_attack(card)
-    except NotAllowedMove as e:
-        logger.warning(f"Игрок {player.id} попытался сделать некорректный ход: {e}")
-        return
-
-    # Обновляем статистику
-    # await _update_attack_stats(player.id)
-
-    display_mode, theme_name = await _get_attack_settings(game.id)
-
-    # Если это был основной атакующий, сбрасываем флаг "пас"
     if player == game.current_player:
         game.is_pass = False
 
+    # Add player to the list of attackers for this round
     if player not in game.round_attackers:
         game.round_attackers.append(player)
 
-    # Финальный раунд (когда у игрока кончились карты, а в колоде пусто)
+    player.play_attack(card)
+
     if not player.cards and len(game.players) <= 2 and not game.deck.cards:
         game.is_final = True
 
-    await gm.save_game(game)
-
     beat_markup = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text='🛡️ Побить эту карту!', switch_inline_query_current_chat=f'beat_{repr(card)}')]
+        [types.InlineKeyboardButton(text='⚔️ Побити цю карту!', switch_inline_query_current_chat=f'{repr(card)}')]
     ])
 
-    # В зависимости от настроек чата, отправляем стикер, текст или и то и другое
     sticker_msg = None
     if display_mode in ['text_and_sticker', 'sticker_and_button']:
         style = 'trump_normal' if card.suit == game.trump else 'normal'
-        sticker_id = th.get_sticker_id(repr(card), theme_name=theme_name, style=style)
+        sticker_id = c.get_sticker_id(repr(card), theme_name=theme_name, style=style)
         if sticker_id:
             try:
-                sticker_msg = await bot.send_sticker(game.id, sticker_id, reply_markup=beat_markup)
+                sticker_msg = await bot.send_sticker(game.chat.id, sticker_id, reply_markup=beat_markup if display_mode == 'sticker_and_button' else None)
                 if sticker_msg:
                     game.attack_sticker_message_ids[card] = sticker_msg.message_id
-                    await gm.save_game(game)
             except Exception:
                 pass
 
-    # Всегда отправляем текстовое сообщение с кнопкой "Побить эту карту!"
-    text = f"⚔️ <b>{player.mention}</b> подкинул(а) карту: {str(card)}\n🛡️ для {game.opponent_player.mention}"
-    msg = await bot.send_message(game.id, text, reply_markup=beat_markup)
-    if msg:
-        game.attack_announce_message_ids[card] = msg.message_id
-        await gm.save_game(game)
+    if not (display_mode == 'sticker_and_button' and sticker_msg):
+        text = f"⚔️ <b>{user.get_mention(as_html=True)}</b> підкинув(ла) карту: {str(card)}\n🛡️ для {game.opponent_player.user.get_mention(as_html=True)}"
+        msg = await bot.send_message(game.chat.id, text, reply_markup=beat_markup)
+        if msg:
+            game.attack_announce_message_ids[card] = msg.message_id
+
+
+async def do_defence_card(player: Player, atk_card: Card, def_card: Card):
+    game = player.game
+    user = player.user
+    bot = Bot.get_current()
+
+    player.play_defence(atk_card, def_card)
     
-    # Проверяем, может ли атакующий продолжать подкидывать
-    active_players_count = len([p for p in game.players if not p.finished_game])
-    
-    # Если только один атакующий или он не может больше подкидывать
-    if active_players_count < 3 or not game.attacker_can_continue:
-        # В случае с одним атакующим или если не может продолжать - завершаем ход
-        if game.all_beaten_cards:
-            await do_turn(game, gm, bot)
-        elif not game.all_beaten_cards and active_players_count > 2:
-            # Уведомляем, если больше нельзя подкидывать
-            await send_no_more_attacks_notification(game, bot)
-    # Если атакующий может продолжать и есть еще игроки для подкидывания
-    elif game.attacker_can_continue and active_players_count >= 2:
-        toss_more_markup = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text='↪️ Подкинуть еще', switch_inline_query_current_chat='')]
-        ])
-        await bot.send_message(
-            game.id,
-            f"↪️ <b>{player.mention}</b> может подкинуть еще карт",
-            reply_markup=toss_more_markup,
-        )
+    with session:
+        us = UserSetting.get(id=user.id) or UserSetting.create(id=user.id)
+        if us.stats:
+            us.cards_beaten += 1
 
-#
-# ИСПРАВЛЕНО: Функционал статистики временно удален.
-#
-# async def _update_defense_stats(user_id: int): ...
-
-async def _update_defense_stats(user_id: int):
-    """
-    Обновляет статистику защиты для пользователя.
-    Updates defense statistics for a user.
-    """
-    us, _ = await UserSetting.get_or_create(user_id=user_id)
-    if us.stats_enabled:
-        us.cards_played += 1
-        us.cards_beaten += 1
-        await us.save()
-
-async def do_defence_card(game: Game, player: Player, atk_card: Card, def_card: Card, gm: GameManager, bot: Bot):
-    """
-    Обрабатывает ход защищающейся картой.
-    
-    Handles a defending card move.
-    """
-    try:
-        player.play_defence(atk_card, def_card)
-    except NotAllowedMove as e:
-        logger.warning(f"Игрок {player.id} попытался сделать некорректный ход: {e}")
-        return
-        
-    # await _update_defense_stats(player.id)
-
-    # Удаляем сообщения и стикеры, связанные с побитой картой
     announce_id = game.attack_announce_message_ids.pop(atk_card, None)
     if announce_id:
-        asyncio.create_task(_delete_message_after_delay(game.id, announce_id, 7, bot))
+        asyncio.create_task(_delete_message_after_delay(game.chat.id, announce_id, 7))
     sticker_id = game.attack_sticker_message_ids.pop(atk_card, None)
     if sticker_id:
-        asyncio.create_task(_delete_message_after_delay(game.id, sticker_id, 7, bot))
+        asyncio.create_task(_delete_message_after_delay(game.chat.id, sticker_id, 7))
 
-    await gm.save_game(game)
+    # Get the number of players still in the game
+    active_players_count = len([p for p in game.players if not p.finished_game])
+    # In a 2-player game, the turn automatically ends if the attacker can't add more cards
+    should_autopass = (not game.attacker_can_continue) and (active_players_count < 3)
 
-    # --- ИСПРАВЛЕНО: Начало универсальной логики "Автопаса" ---
-    attacker = game.current_player
-    attacker_has_autopass = False
-    if attacker:
-        us, _ = await UserSetting.get_or_create(user_id=attacker.id)
-        if us.auto_pass_enabled:
-            attacker_has_autopass = True
-
-    forced_pass = not game.attacker_can_continue
-    manual_pass = game.is_pass
-    # --- ИСПРАВЛЕНО: Конец универсальной логики "Автопаса" ---
-
-    # Если все карты побиты и раунд окончен (из-за паса, авто-паса или невозможности подкинуть)
-    if game.all_beaten_cards and (manual_pass or attacker_has_autopass or forced_pass):
-        # Отправляем уведомление, только если это был автоматический пас, а не ручной
-        if attacker_has_autopass and not manual_pass:
-            msg = await bot.send_message(
-                game.id, f"↪️ {attacker.mention} автоматически пасует (настройка Автопас)."
-            )
-            if msg:
-                asyncio.create_task(_delete_message_after_delay(msg.chat.id, msg.message_id, 7, bot))
-        
-        await do_turn(game, gm, bot)
+    # If all cards are beaten and the attacker passes or is forced to pass, end the turn
+    if game.all_beaten_cards and (game.is_pass or should_autopass):
+        await do_turn(game)
     else:
-        # Раунд не окончен, можно подкидывать
         toss_more_markup = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text='↪️ Подкинуть еще', switch_inline_query_current_chat='')]
+            [types.InlineKeyboardButton(text='↪️ Підкинути ще', switch_inline_query_current_chat='')]
         ])
         await bot.send_message(
-            game.id,
-            f"🛡️ <b>{player.mention}</b> побил(а) карту {str(atk_card)} картой {str(def_card)}",
+            game.chat.id,
+            f"🛡️ <b>{user.get_mention(as_html=True)}</b> побив(ла) карту {str(atk_card)} картою {str(def_card)}",
             reply_markup=toss_more_markup,
         )
         
-        # Уведомляем, если больше нельзя подкидывать (актуально для >2 игроков)
-        active_players_count = len([p for p in game.players if not p.finished_game])
+        # If no more attacks are allowed, send a notification
         if not game.allow_atack and active_players_count > 2:
-            await send_no_more_attacks_notification(game, bot)
+            await send_no_more_attacks_notification(game)
+

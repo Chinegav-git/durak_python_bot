@@ -1,186 +1,141 @@
-# -*- coding: utf-8 -*-
-"""
-Модуль, определяющий сущность "Игрок".
-
-Module defining the "Player" entity.
-"""
-
 from __future__ import annotations
+from datetime import datetime
+from time import time
+from aiogram import types
+from typing import List, Optional, Set
 
 import logging
 import typing
-from datetime import datetime
-from time import time
-from typing import Any, Dict, List, Optional, Set
 
-from aiogram import types
-from aiogram.utils.link import create_tg_link
+from . import card as c
+from .errors import (DeckEmptyError)
 
 from config import Config
-from .card import Card
-from .errors import NotAllowedMove
 
 if typing.TYPE_CHECKING:
     from .game import Game
+    from .card import Card
 
 
 class Player:
-    """
-    Представляет игрока, его состояние и его возможные действия в игре.
-    Represents a player, their state, and their possible actions in the game.
-    """
+    """ This is Player"""
 
-    def __init__(self, game: 'Game', user: types.User) -> None:
-        self.game = game
-        self._user_id = user.id
-        self._first_name = user.first_name
-        self._last_name = user.last_name
-        self._username = user.username
-        
-        self.cards: List[Card] = []
-        self.finished_game: bool = False
+    def __init__(self, game: Game, user: types.User) -> None:
+        self.user: types.User = user  # User obj | from Aiogram
+        self.game: Game = game  # Game obj
+        self.cards: List[Card] = list()
+        self.finished_game: bool = False # Player status
+        self.logger = logging.getLogger(__name__)
         self.anti_cheat: int = int(time())
         self.turn_started: datetime = datetime.now()
         self.waiting_time: int = Config.WAITING_TIME
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Возвращает состояние объекта для сериализации (pickle), исключая несериализуемые объекты.
-        Returns the object state for serialization (pickle), excluding non-serializable objects.
-        """
-        state = self.__dict__.copy()
-        # Удаляем ссылку на игру, так как она будет сериализована в Game
-        # Remove game reference as it will be serialized in Game
-        if 'game' in state:
-            del state['game']
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]):
-        """
-        Восстанавливает состояние объекта после десериализации.
-        Restores the object state after deserialization.
-        """
-        self.__dict__.update(state)
-        # Поле 'game' должно быть установлено родителем (Game) при десериализации
-        # The 'game' field must be set by the parent (Game) during deserialization
-        self.game = None
-
-    @property
-    def id(self) -> int:
-        return self._user_id
-
-    @property
-    def first_name(self) -> str:
-        return self._first_name
-
-    @property
-    def username(self) -> Optional[str]:
-        return self._username
-    
-    @property
-    def mention(self) -> str:
-        """
-        Возвращает HTML-форматированную строку для упоминания пользователя в Telegram.
-        Returns an HTML-formatted string to mention the user in Telegram.
-        """
-        name = self._first_name
-        if self._last_name:
-            name += f" {self._last_name}"
-        
-        return f'<a href="{create_tg_link("user", id=self._user_id)}">{name}</a>'
-
     def add_cards(self, cards: List[Card]):
-        """
-        Добавляет карты в руку игрока.
-        Adds cards to the player's hand.
-        """
-        self.cards.extend(cards)
-        self.cards.sort()
+        """ Add cards in hands """
+        self.cards += cards
+
 
     def leave(self):
-        """
-        Обрабатывает выход игрока из игры, сбрасывая его карты в биту.
-        Handles a player leaving the game by dismissing their cards to the beaten pile.
-        """
+        """ Cleaning self (Cards) """
         for card in self.cards:
             self.game.deck.dismiss(card)
         self.cards.clear()
 
-    def play_attack(self, card: Card):
-        """
-        Выполняет ход атакующей картой.
-        Performs a move with an attacking card.
-        """
-        if card not in self.playable_card_atk():
-            raise NotAllowedMove("You can't play this card")
 
+    def play_attack(self, card: Card):
+        """ Plays a card and removes it from hand """
         self.remove_card(card)
         self.game.attack(card)
 
+
     def play_defence(self, attacking_card: Card, defending_card: Card):
-        """
-        Выполняет ход защищающейся картой.
-        Performs a move with a defending card.
-        """
-        if defending_card not in self.playable_card_def(attacking_card):
-            raise NotAllowedMove("You can't play this card")
-        
         self.remove_card(defending_card)
         self.game.defend(attacking_card, defending_card)
     
     def playable_card_atk(self) -> Set[Card]:
-        """
-        Определяет, какими картами игрок может атаковать.
-        Determines which cards the player can attack with.
-        """
-        if not self.game.allow_atack and self.game.field:
+        """ Returns a set of cards the player can legally attack with for faster lookups. """
+        game = self.game
+
+        # If the attack limit is reached and the field is not empty, no more cards can be added.
+        if not game.allow_atack and game.field:
             return set()
 
-        if self == self.game.opponent_player:
+        # The defender can never add cards.
+        if self == game.opponent_player:
             return set()
 
-        if not self.game.field:
-            return set(self.cards) if self == self.game.current_player else set()
+        # If the field is empty, only the main attacker can play any of their cards.
+        if not game.field:
+            if self == game.current_player:
+                return set(self.cards)
+            else: # Other players can't start
+                return set()
 
-        all_field_cards = self.game.attacking_cards + self.game.defending_cards
+        # If the field is not empty, any non-defender can add a card if it matches a rank on the field.
+        all_field_cards = game.attacking_cards + game.defending_cards
         field_values = {c.value for c in all_field_cards if c}
+
         return {card for card in self.cards if card.value in field_values}
 
     def playable_card_def(self, atk_card: Optional[Card] = None) -> Set[Card]:
-        """
-        Определяет, какими картами игрок может защищаться.
-        Determines which cards the player can defend with.
-        """
+        """ Returns a set of cards the player can legally defend with. """
         if not atk_card:
             return set()
         return {card for card in self.cards if self.can_beat(atk_card, card)}
 
+
+    def card_match(self, card_1: Card, card_2: Card) -> bool:
+        if card_1 is None or card_2 is None:
+            return False
+        return card_1.value == card_2.value
+    
+
+    def can_add_to_field(self, card: Card) -> bool:
+        """ Determines if the player can add a specific card to the field. """
+        # The defender can never add cards.
+        if self == self.game.opponent_player:
+            return False
+
+        field = self.game.field
+
+        # If the field is empty, only the main attacker can start.
+        if not field:
+            return self == self.game.current_player
+
+        # If the field is not empty, any non-defender can add a card if it matches rank.
+        all_field_cards = self.game.attacking_cards + self.game.defending_cards
+        field_values = {c.value for c in all_field_cards if c}
+
+        return card.value in field_values
+
+
     def can_beat(self, atk_card: Card, def_card: Card) -> bool:
-        """
-        Проверяет, может ли защитная карта побить атакующую.
-        Checks if a defending card can beat an attacking card.
-        """
-        def_value = int(def_card.value)
-        atk_value = int(atk_card.value)
+        # Convert card values to integers for correct comparison
+        def_card_value = int(def_card.value)
+        atk_card_value = int(atk_card.value)
 
         if def_card.suit == self.game.trump:
-            return atk_card.suit != self.game.trump or def_value > atk_value
+            # A trump card can beat any non-trump, or a lower-ranking trump
+            return (atk_card.suit != self.game.trump) or (def_card_value > atk_card_value)
         
-        return def_card.suit == atk_card.suit and def_value > atk_value
+        elif def_card.suit == atk_card.suit:
+            # A non-trump card can only beat a lower-ranking card of the same suit
+            return def_card_value > atk_card_value
+        
+        else:
+            # Different non-trump suits cannot beat each other
+            return False
+
 
     def remove_card(self, card: Card):
-        """
-        Удаляет карту из руки игрока.
-        Removes a card from the player's hand.
-        """
-        try:
+        if card in self.cards:
             self.cards.remove(card)
-        except ValueError:
-            logging.warning(f"Attempted to remove card {card} not in player's hand for user {self.id}")
-            raise NotAllowedMove(f"Card {card} not in hand")
+        else:
+            self.logger.warning(f"Attempted to remove card {card} not in player's hand for user {self.user.id}")
 
     def __repr__(self) -> str:
-        return f"<Player id={self.id} name='{self.first_name}'>"
+        return repr(self.user)
     
+
     def __str__(self) -> str:
-        return self.first_name
+        return str(self.user)

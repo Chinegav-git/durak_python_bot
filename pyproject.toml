@@ -1,5 +1,7 @@
-# Этот файл был очищен, так как содержал только конфигурацию для aerich,
-# которая больше не используется в проекте.
-
-# This file was cleared as it only contained configuration for aerich,
-# which is no longer used in the project.
+[project]
+name = "myapp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []

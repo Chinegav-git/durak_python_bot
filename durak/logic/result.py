@@ -1,120 +1,103 @@
-# -*- coding: utf-8 -*-
-"""
-Модуль для генерации результатов инлайн-режима.
-
-Этот модуль отвечает за преобразование текущего состояния игры (Game, Player)
-в список объектов `InlineQueryResult`, которые Telegram отображает пользователю
-в виде подсказок над полем ввода. Каждый результат представляет собой возможное
-действие (например, походить картой, взять, пас) или информационное сообщение.
-
--------------------------------------------------------------------------------
-
-Module for generating inline mode results.
-
-This module is responsible for converting the current game state (Game, Player)
-into a list of `InlineQueryResult` objects, which Telegram displays to the user
-as suggestions above the input field. Each result represents a possible
-action (e.g., play a card, draw, pass) or an informational message.
-"""
-
-import html
+from aiogram import types
+from aiogram.types import InlineQueryResultArticle, InlineQueryResult, \
+                    InlineQueryResultCachedSticker as Sticker, \
+                    InputTextMessageContent, InlineKeyboardButton, \
+                    InlineKeyboardMarkup
 from typing import List
 from uuid import uuid4
+from config import Commands
 
-from aiogram.types import (
-    InlineQueryResult,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
-)
-
-from ..objects import Card, Game, Player
-from ..utils.i18n import I18n
+from ..objects import Player, Game, Card, card as c
 
 
-def add_no_game(results: List[InlineQueryResult], l: I18n):
-    """
-    Добавляет сообщение о том, что пользователь не участвует в игре.
-    Adds a message indicating that the user is not participating in a game.
-    """
+def add_no_game(results: List[InlineQueryResult]):
+    """Add text result if user is not playing"""
     results.append(
         InlineQueryResultArticle(
             id="nogame",
-            title=l.t('inline.my_cards_title'),
-            description=l.t('inline.my_cards_no_game'),
-            input_message_content=InputTextMessageContent(
-                message_text=l.t('game.no_game')
-            ),
+            title = "🎮 Ви не граєте",
+            input_message_content=
+            InputTextMessageContent('🚫 Ви зараз не граєте. Використовуйте /new щоб '
+                                    'почати гру або /join, щоб приєднатися до гри '
+                                    'поточна гра в цій групі')
         )
     )
 
 
-def add_not_started(results: List[InlineQueryResult], l: I18n):
-    """
-    Добавляет сообщение о том, что игра еще не началась.
-    Adds a message indicating that the game has not yet started.
-    """
+def add_not_started(results: List[InlineQueryResult]):
+    """Add text result if the game has not yet started"""
     results.append(
         InlineQueryResultArticle(
-            id="notstarted",
-            title=l.t('inline.my_cards_title'),
-            description=l.t('game.already_started'),
-            input_message_content=InputTextMessageContent(
-                message_text=l.t('game.already_started')
-            ),
+            id="nogame",
+            title = "⏳ Гра ще не почалася",
+            input_message_content=
+            InputTextMessageContent(f'🚀 Запустити гру /{Commands.START}')
         )
     )
 
 
-def add_draw(game: Game, player: Player, results: List[InlineQueryResult], theme_name: str, l: I18n):
-    """
-    Добавляет опцию "Взять карты" в виде статьи.
-    Adds a "Draw cards" option as an article.
-    """
+def add_draw(player: Player, results: List[InlineQueryResult], theme_name: str):
+    """Add option to draw"""
+    game = player.game
+    sticker_id = c.get_sticker_id('draw', theme_name)
+    if not sticker_id:
+        return # Or add a default text representation
+
     results.append(
-        InlineQueryResultArticle(
-            id="draw",
-            title=l.t('game.take_action_title'),
-            description=l.t('game.take_action_description'),
-            input_message_content=InputTextMessageContent(
-                message_text=l.t('game.take_action', name=player.name),
-                parse_mode=None
-            ),
+        Sticker(
+            id="draw", sticker_file_id=sticker_id,
+            input_message_content=
+            InputTextMessageContent(f"🎴 {player.user.get_mention(as_html=True)} взяв(а) карти!")
         )
     )
 
 
-def add_pass(game: Game, results: List[InlineQueryResult], theme_name: str, l: I18n):
-    """
-    Добавляет опцию "Пас" в виде статьи.
-    Adds a "Pass" option as an article.
-    """
+def add_gameinfo(game: Game, results: List[InlineQueryResult], theme_name: str):
+    """Add option to show game info"""
+    sticker_id = c.get_sticker_id('info', theme_name)
+    if not sticker_id:
+        return
+
     results.append(
-        InlineQueryResultArticle(
-            id="pass",
-            title=l.t('game.pass_action_title'),
-            description=l.t('game.pass_action_description'),
-            input_message_content=InputTextMessageContent(
-                message_text=l.t('game.pass_action'),
-                parse_mode=None
-            ),
+        Sticker(
+            id="gameinfo",
+            sticker_file_id=sticker_id,
+            input_message_content=game_info(game)
         )
     )
 
 
-def add_card(
-    game: Game,
-    atk_card: Card,
-    results: List[InlineQueryResult],
-    can_play: bool,
-    theme_name: str,
-    l: I18n,
-    def_card: Card = None,
-):
-    """
-    Добавляет опцию, представляющую собой игральную карту, в виде статьи.
-    Adds an option representing a playing card as an article.
-    """
+def add_pass(results: List[InlineQueryResult], game: Game, theme_name: str):
+    """Add option to pass"""
+    sticker_id = c.get_sticker_id('pass', theme_name)
+    if not sticker_id:
+        return
+
+    results.append(
+        Sticker(
+            id="pass", sticker_file_id=sticker_id,
+            input_message_content=InputTextMessageContent(
+                '✅ Пас'
+            )
+        )
+    )
+
+
+def add_card(game: Game, atk_card: Card, results: List[InlineQueryResult], can_play: bool, theme_name: str, def_card: Card = None, player: Player = None):
+    """Add an option that represents a card"""
     card_to_show = def_card or atk_card
+    is_trump = card_to_show.suit == game.trump
+
+    style = 'grey'
+    if can_play:
+        style = 'trump_normal' if is_trump else 'normal'
+    else:
+        style = 'trump_grey' if is_trump else 'grey'
+
+    sticker_id = c.get_sticker_id(repr(card_to_show), theme_name, style=style)
+    if not sticker_id:
+        # Fallback or log error if a card sticker is missing
+        return
 
     id_ = repr(atk_card)
     if def_card:
@@ -122,80 +105,44 @@ def add_card(
 
     if can_play:
         if def_card:
-            message_text = l.t('inline.defend_action', card=str(def_card))
-            title = l.t('inline.defend_title', card=str(def_card))
-            description = l.t('inline.defend_description', card=str(atk_card))
-        else:
-            message_text = l.t('inline.attack_action', card=str(atk_card))
-            title = l.t('inline.attack_title', card=str(atk_card))
-            description = l.t('inline.attack_description')
-        
-        results.append(
-            InlineQueryResultArticle(
-                id=id_,
-                title=title,
-                description=description,
-                input_message_content=InputTextMessageContent(
-                    message_text=message_text,
-                    parse_mode=None
-                ),
-            )
-        )
-    else:
-        results.append(
-            InlineQueryResultArticle(
-                id=str(uuid4()),  # Уникальный ID, чтобы избежать коллизий
-                title=l.t('inline.cannot_play_title', card=str(card_to_show)),
-                description=l.t('inline.cannot_play_description'),
-                input_message_content=InputTextMessageContent(
-                    message_text=l.t('inline.cannot_play_card'),
-                    parse_mode=None
+            results.append(
+                Sticker(id=id_, sticker_file_id=sticker_id,
+                    input_message_content=InputTextMessageContent(
+                        f"🛡️ Побито карту {str(atk_card)} картою {str(def_card)}"
+                    )
                 )
             )
+        else:
+            results.append(
+                Sticker(id=id_, sticker_file_id=sticker_id,
+                    input_message_content=InputTextMessageContent(
+                        f"⚔️ Підкинуто карту: {str(atk_card)}"
+                    )
+                )
+            )
+    else:
+        results.append(
+            Sticker(id=str(uuid4()), sticker_file_id=sticker_id,
+                    input_message_content=game_info(game))
         )
 
 
-def game_info(game: Game, l: I18n) -> InputTextMessageContent:
-    """
-    Формирует подробную информацию о текущем состоянии игры.
-    Generates detailed information about the current game state.
-    """
-    players_info = ''.join(f"\n👤 <code>{len(pl.cards)}</code> 🃏 | {html.escape(pl.mention)}" for pl in game.players)
+def game_info(game: Game):
+    players = game.players
+    field = game.field
+    trump = game.trump
+    count_cards_in_deck = len(game.deck.cards)
+
+    pleyers_info = ''.join(f"\n👤 {len(pl.cards)} 🃏 | {pl.user.get_mention(as_html=True)}" for pl in players)
     
-    field_info = ''.join(
-        f'\n  <code>{str(a)}</code> ◄- <code>{str(d) if d else "❌"}</code>'
-        for a, d in game.field.items()
-    )
+    field_info = ''.join(f'\n  {str(a)} ◄-- {str(d) if not d is None else "❌"}' for a, d in field.items())
 
     return InputTextMessageContent(
-        message_text=l.t(
-            'game.info_text',
-            attacker_mention=html.escape(game.current_player.mention),
-            attacker_cards=len(game.current_player.cards),
-            defender_mention=html.escape(game.opponent_player.mention),
-            defender_cards=len(game.opponent_player.cards),
-            trump_icon=game.deck.trump_ico,
-            deck_size=len(game.deck.cards),
-            players_info=players_info,
-            field_info=field_info if game.field else l.t('game.field_empty')
-        ),
-        parse_mode="HTML",
-    )
-
-
-def add_gameinfo(game: Game, results: List[InlineQueryResult], l: I18n):
-    """
-    Добавляет опцию для отображения информации об игре в виде статьи.
-    Это исправляет ошибку DOCUMENT_INVALID, так как Sticker не поддерживает HTML.
-
-    Adds an option to display game information as an article.
-    This fixes the DOCUMENT_INVALID error, as Sticker does not support HTML.
-    """
-    results.append(
-        InlineQueryResultArticle(
-            id="gameinfo",
-            title=l.t('inline.game_info_title'),
-            description=l.t('inline.game_info_description'),
-            input_message_content=game_info(game, l)
-        )
+        f"<b>🎮 Інформація про гру</b>\n\n"
+        f"⚔️ <b>Атакуючий:</b> {game.current_player.user.get_mention(as_html=True)} 🃏 {len(game.current_player.cards)} карт\n"
+        f"🛡️ <b>Захисник:</b> {game.opponent_player.user.get_mention(as_html=True)} 🃏 {len(game.opponent_player.cards)} карт\n\n"
+        f"🎯 <b>Козир:</b> {game.deck.trump_ico}\n"
+        f"📦 <b>В колоді:</b> {len(game.deck.cards)} карт\n\n"
+        f"<b>👥 Гравці:</b>{pleyers_info}\n"
+        f"<b>🏟️ Поле:</b>\n{field_info if field else '  тут пусто~'}\n"
     )

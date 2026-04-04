@@ -1,20 +1,16 @@
-from aiogram import F, Router, types
-from aiogram.filters import Command
-from config import Commands
-from durak.objects import NoGameInChatError
-
-router = Router()
-gm = None  # Will be initialized later
+from aiogram import types
+from loader import dp, gm, Commands
+from durak.objects.errors import NoGameInChatError
 
 
-@router.message(Command(Commands.TEST_WIN))
+@dp.message_handler(commands=[Commands.TEST_WIN], is_admin=True)
 async def test_win(message: types.Message):
     """
     Handler for /test_win command to instantly end the game with a winner.
     Available only for admins.
     """
     try:
-        game = await gm.get_game_from_chat(message.chat)
+        game = gm.get_game_from_chat(message.chat)
     except NoGameInChatError:
         return await message.reply("Гру в цьому чаті не знайдено.")
 

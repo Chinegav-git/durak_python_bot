@@ -1,102 +1,30 @@
-# -*- coding: utf-8 -*-
-"""
-Файл конфигурации.
-Загружает переменные окружения и определяет основные настройки бота.
-Configuration file.
-Loads environment variables and defines the main settings for the bot.
-"""
-
 from dataclasses import dataclass
 from enum import StrEnum
 from environs import Env
 from typing import List, Tuple, Dict, ClassVar
 
-# Инициализируем environs для чтения переменных окружения
-# Initialize environs to read environment variables
+
 env = Env()
 env.read_env()
 
-# --- Загрузка переменных из .env файла ---
-# --- Loading variables from the .env file ---
-# Токен Telegram бота. Присваиваем None по умолчанию, чтобы избежать падения при импорте.
-# Telegram bot token. Assign None by default to avoid crashing on import.
-BOT_TOKEN = env.str("BOT_TOKEN", None)
 
-# Список администраторов бота (строковый).
-# List of bot administrators (raw string).
-ADMINS_RAW = env.list("ADMINS", [])
-
-# Обработка списка админов с защитой от неверных данных
-# Processing the admin list with protection against invalid data
-ADMINS = []
-if ADMINS_RAW:
-    try:
-        ADMINS = list(map(int, ADMINS_RAW))
-    except (ValueError, TypeError):
-        # В будущем здесь можно будет добавить логирование
-        # Logging can be added here in the future
-        print(f"ПРЕДУПРЕЖДЕНИЕ: Переменная окружения ADMINS ('{ADMINS_RAW}') содержит нечисловые значения и будет проигнорирована.")
-
-# Настройки подключения к Redis
-# Redis connection settings
-REDIS_HOST = env.str("REDIS_HOST", "localhost")
-REDIS_PORT = env.int("REDIS_PORT", 6379)
-REDIS_DB = env.int("REDIS_DB", 0)
-
-# URL для подключения к базе данных
-# Database connection URL
-DATABASE_URL = env.str("DATABASE_URL", "sqlite://durak.sqlite")
+BOT_TOKEN = env.str("BOT_TOKEN")
+ADMINS = list(map(int, env.list("ADMINS")))
 
 
 @dataclass
 class Config:
-    """
-    Основной класс конфигурации, используемый в приложении.
-    Содержит как статические, так и загружаемые из .env файла параметры.
-    The main configuration class used in the application.
-    Contains both static and .env-loaded parameters.
-    """
-    # --- Загружаемые переменные ---
-    # --- Loaded variables ---
     BOT_TOKEN: str = BOT_TOKEN
     ADMINS: ClassVar[List[int]] = ADMINS
-    DATABASE_URL: str = DATABASE_URL
 
-    # --- Игровые константы ---
-    # --- Game constants ---
-    # Время ожидания в лобби (в секундах)
-    # Lobby waiting time (in seconds)
     WAITING_TIME: int = 120
-
-    # Максимальное количество игроков в одной игре
-    # Maximum number of players in a single game
     MAX_PLAYERS: int = 6
-
-    # Количество карт, раздаваемых в начале игры
-    # Number of cards dealt at the start of the game
     COUNT_CARDS_IN_START: int = 6
-
-    # Игровой режим по умолчанию. 'sticker_and_button' - стикеры и кнопки
-    # Default game mode. 'sticker_and_button' - stickers and buttons
-    DEFAULT_GAMEMODE: str = "sticker_and_button"
-
-    # Режим отладки
-    # Debug mode
+    DEFAULT_GAMEMODE: str = "p"  # :> .......
     DEBUG: bool = False
-
-    # --- Настройки Redis ---
-    # --- Redis Settings ---
-    REDIS_HOST: str = REDIS_HOST
-    REDIS_PORT: int = REDIS_PORT
-    REDIS_DB: int = REDIS_DB
     
 
 class Commands:
-    """
-    Класс, содержащий текстовые представления команд бота для удобного доступа.
-    
-    A class containing text representations of bot commands for easy access.
-    """
     NEW: str = 'new'
     JOIN: str = 'join'
     START: str = 'run'
@@ -107,25 +35,22 @@ class Commands:
     HELP: str = 'help'
     START_BOT: str = 'start'
     STATS: str = 'stats'
-    SETTINGS: str = 'settings'
     OFF_STATS: str = 'off_stats'
     ON_STATS: str = 'on_stats'
     TEST_WIN: str = 'test_win'
-    
+    IGOR: str = 'igor'
+    GRINA: str = 'grina'
 
-# Список команд и их описаний для меню в Telegram
-# List of commands and their descriptions for the Telegram menu
-# Note: These will be dynamically translated based on user language
 COMMANDS: List[Tuple[str, str]] = [
-    (Commands.NEW, 'new'),  # Will be translated as t('commands.new')
-    (Commands.JOIN, 'join'),  # Will be translated as t('commands.join')
-    (Commands.START, 'start'),  # Will be translated as t('commands.start')
-    (Commands.LEAVE, 'leave'),  # Will be translated as t('commands.leave')
-    (Commands.GLEAVE, 'gleave'),  # Will be translated as t('commands.gleave')
-    (Commands.KICK, 'kick'),  # Will be translated as t('commands.kick')
-    (Commands.KILL, 'kill'),  # Will be translated as t('commands.kill')
-    (Commands.HELP, 'help'),  # Will be translated as t('commands.help')
-    (Commands.STATS, 'stats'),  # Will be translated as t('commands.stats')
-    (Commands.OFF_STATS, 'off_stats'),  # Will be translated as t('commands.off_stats')
-    (Commands.ON_STATS, 'on_stats')  # Will be translated as t('commands.on_stats')
+    (Commands.NEW, 'Створити нову гру'),
+    (Commands.JOIN, 'Приєднатися до гри'),
+    (Commands.START, 'Запустити гру'),
+    (Commands.LEAVE, 'Покинути гру або лобі'),
+    (Commands.GLEAVE, 'Покинути гру у всіх чатах'),
+    (Commands.KICK, 'Вигнати гравця'),
+    (Commands.KILL, 'Завершити гру'),
+    (Commands.HELP, 'Допомога по боту'),
+    (Commands.STATS, 'Ваша статистика'),
+    (Commands.OFF_STATS, 'Вимкнути статистику'),
+    (Commands.ON_STATS, 'Увімкнути статистику')
 ]

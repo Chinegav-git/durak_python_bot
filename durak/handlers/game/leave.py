@@ -1,59 +1,36 @@
-from aiogram import F, Router, types
-from aiogram.filters import Command
-from aiogram.enums import ChatType
+from aiogram import types
+from loader import bot, dp, gm, Commands
+import durak.logic.actions as a
+from durak.objects import *
+from pony.orm import db_session
 
-from durak.logic import actions
-from durak.logic.game_manager import GameManager
-from durak.objects import NoGameInChatError, NotEnoughPlayersError
-from durak.utils.i18n import t
-
-router = Router()
-
-
-@router.message(
-    Command("leave"),
-    F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP})
-)
-async def leave_game_handler(message: types.Message, gm: GameManager):
-    """
-    Handles a player leaving a game or lobby in the current chat.
-    """
-    user = message.from_user
-    chat = message.chat
+@dp.message_handler(commands=[Commands.LEAVE], chat_type=['group', 'supergroup'])
+async def leave_handler(message: types.Message):
+    """ Leave a game """
+    user = types.User.get_current()
+    chat = types.Chat.get_current()
 
     try:
-        game = await gm.get_game_from_chat(chat.id)
+        game = gm.get_game_from_chat(chat)
     except NoGameInChatError:
-        await message.answer(
-            f"{t('game.no_game')}\n"
-            f"{t('game.create_new')}"
-        )
+        await message.answer(f'🚫 У цьому чаті немає гри!\n🎮 Створіть її за допомогою - /{Commands.NEW}')
         return
 
     player = game.player_for_id(user.id)
-    if not player:
-        await message.answer(t('game.not_participating'))
+
+    if player is None:
+        await message.answer('🚫 Ви не в цій грі!')
         return
 
-    mention = user.first_name
-
     try:
-        # ИСПРАВЛЕНО (рефакторинг): Передаем gm и bot в функцию
-        await actions.do_leave_player(game, player, gm, message.bot)
-
-        if game.started:
-            # The game state (current_player) is updated within do_leave_player
-            await message.answer(t('game.left_game', name=mention))
-        else:
-            # Player left the lobby
-            await message.answer(t('game.left_lobby', name=mention))
-
+        # This action now needs to handle the DB update
+        await a.do_leave_player(player)
     except NotEnoughPlayersError:
-        # This happens if the last player leaves
-        await gm.end_game(game)
-        await message.answer(
-            f"{t('game.last_player_left', name=mention)}\n"
-            "🎮 Гра завершена!"
-        )
-    except Exception as e:
-        await message.reply(t('errors.unexpected', error=e))
+        # end_game now handles all DB updates for all players
+        gm.end_game(chat)
+        await message.answer('🎮 Гра завершена, оскільки гравців не залишилося!')
+    else:
+        if game.started:
+            await message.answer(f'👍 Добре, хід робить гравець {game.current_player.user.get_mention(as_html=True)}')
+        else:
+            await message.answer(f'👋 ({user.get_mention(as_html=True)}) - Покинув(ла) лобі!')

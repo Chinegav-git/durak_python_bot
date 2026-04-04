@@ -1,68 +1,113 @@
-# -*- coding: utf-8 -*-
-"""
-Обработчик выбора в инлайн-режиме (когда игрок нажимает на карту).
+from aiogram import types
+from typing import Optional
 
-Handler for inline mode selection (when a player clicks on a card).
-"""
-import logging
-
-from aiogram import Bot, F, Router, types
-
-from durak.logic import actions
-from durak.logic.game_manager import GameManager
-from durak.objects import Card, NoGameInChatError, Player
-
-logger = logging.getLogger(__name__)
-
-router = Router()
+from loader import bot, dp, gm
+from durak.objects import * # This will import NoGameInChatError from durak.objects.errors
+from durak.logic import actions, result
 
 
-@router.chosen_inline_result()
-async def chosen_inline_result_handler(
-    query: types.ChosenInlineResult, gm: GameManager, bot: Bot
-):
-    """
-    Обрабатывает выбор, сделанный игроком в инлайн-режиме.
-    
-    Handles the selection made by a player in inline mode.
-    """
-    user = query.from_user
-    try:
-        game = await gm.get_game_by_user_id(user.id)
-    except NoGameInChatError:
+def get_player_for_user(user: types.User) -> Optional[Player]:
+    """Finds the player object for a given user across all active games."""
+    for game in gm.games.values():
+        for player in game.players:
+            if player.user.id == user.id:
+                return player
+    return None
+
+
+async def send_cheat_att(player: Player):
+    chat = player.game.chat
+    user = player.user
+    await bot.send_message(
+            chat.id,
+            text = f"🚫 Спроба шахраювати {user.get_mention(as_html=True)}"
+        )
+
+
+@dp.chosen_inline_handler()
+async def result_handler(query: types.ChosenInlineResult):
+    ''' Inline process '''
+    user = types.User.get_current()
+    player = get_player_for_user(user)
+
+    if player is None or not player.game.started:
         return
 
-    player = game.player_for_id(user.id)
-    if not player:
-        return
-
+    game = player.game
     result_id = query.result_id
+    chat = game.chat
 
-    # Идентификатор результата кодирует действие и данные.
-    # Новый формат: "attack|14_h", "defend|14_h|6_c"
-    # Старый формат (совместимость): "attack_14h", "defend_14h_6c"
-    sep = '|' if '|' in result_id else '_'
-    parts = result_id.split(sep)
-    action = parts[0]
+    if result_id in ('hand', 'gameinfo', 'nogame'):
+        return
 
-    if action == "attack":
-        # После первого разделителя всё остальное — строковое представление карты.
-        card_repr = sep.join(parts[1:])
-        card = Card.from_repr(card_repr)
-        await actions.do_attack_card(game, player, card, gm, bot)
-    elif action == "defend":
-        payload = parts[1:]
-        if sep == '|' and len(payload) == 2:
-            atk_repr, def_repr = payload
-        else:
-            # Фолбэк для старого формата: пытаемся разделить поровну.
-            mid = len(payload) // 2 or 1
-            atk_repr = sep.join(payload[:mid])
-            def_repr = sep.join(payload[mid:])
-        atk_card = Card.from_repr(atk_repr)
-        def_card = Card.from_repr(def_repr)
-        await actions.do_defence_card(game, player, atk_card, def_card, gm, bot)
-    elif action == "pass":
-        await actions.do_pass(game, player, gm, bot)
-    elif action == "draw":
-        await actions.do_draw(game, player, gm, bot)
+    # ANTI-CHEAT
+    try:
+        result_id, anti_cheat = result_id.split(':')
+        split_result_id = result_id.split('-')
+        last_anti_cheat = player.anti_cheat
+        player.anti_cheat += 1
+        if int(anti_cheat) != last_anti_cheat:
+            # await send_cheat_att(player)
+            return # Ignore old queries
+    except (ValueError, IndexError):
+        await send_cheat_att(player) # Invalid format
+        return
+
+    field_cards = set(game.attacking_cards) | set(game.defending_cards)
+
+    if result_id.startswith('mode_'):
+        mode = result_id[5:]
+        return
+    
+    elif len(result_id) == 36:  # UUID result, ignore
+        return
+    
+    elif result_id == 'draw':
+        await actions.do_draw(player)
+
+    elif result_id == 'pass':
+        await actions.do_pass(player)
+    
+    elif len(split_result_id) == 1:  # ATTACK
+        try:
+            atk_card_str = split_result_id[0]
+            atk_card = next((card for card in player.cards if repr(card) == atk_card_str), None)
+            if atk_card is None:
+                return
+        except Exception:
+            return
+        
+        if player == game.opponent_player and atk_card in game.attacking_cards and game.field.get(atk_card) is None:
+            return
+        
+        if not (player == game.current_player or player == game.support_player):
+            return
+
+        if not player.can_add_to_field(atk_card) or \
+           (player == game.current_player and not game.allow_atack) or \
+           (player == game.support_player and not game.allow_support_attack) or \
+           atk_card in field_cards:
+            return
+            
+        await actions.do_attack_card(player, atk_card)
+
+    elif len(split_result_id) == 2:  # DEFEND
+        if player != game.opponent_player:
+            return
+        
+        try:
+            atk_card_str, def_card_str = split_result_id
+            atk_card = next((card for card in game.attacking_cards if repr(card) == atk_card_str), None)
+            def_card = next((card for card in player.cards if repr(card) == def_card_str), None)
+
+            if not atk_card or not def_card:
+                return
+        except Exception:
+            return
+
+        if not player.can_beat(atk_card, def_card) or \
+           game.field.get(atk_card) is not None or \
+           def_card in field_cards:
+            return
+
+        await actions.do_defence_card(player, atk_card, def_card)
