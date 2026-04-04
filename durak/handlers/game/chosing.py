@@ -2,7 +2,7 @@ from aiogram import types
 from typing import List, Optional
 import asyncio
 
-from loader import bot, dp, gm, CHOISE, db_session
+from loader import bot, dp, gm, CHOISE
 from durak.objects import *
 from durak.logic import result as r
 from durak.db.chat_settings import get_chat_settings
@@ -17,28 +17,6 @@ def get_player_for_user(user: types.User) -> Optional[Player]:
 
 @dp.inline_handler()
 async def inline_handler(query: types.InlineQuery):
-    # --- БЛОК МЕМОВ ---
-    if query.query.startswith('meme'):
-        from durak.db.meme_models import MemeSession, MemeEntry
-        with db_session:
-            # Ищем запись игрока в активном раунде сбора мемов
-            entry = MemeEntry.get(player_id=query.from_user.id, session__status='gathering')
-            
-            if not entry:
-                return await query.answer([], switch_pm_text="Ви не в грі або раунд ще не почався!", switch_pm_parameter="join")
-
-            hand_stickers = entry.hand.split(",")
-            
-            results = [
-                types.InlineQueryResultCachedSticker(
-                    id=f"meme_{i}", 
-                    sticker_file_id=s_id
-                )
-                for i, s_id in enumerate(hand_stickers)
-            ]
-            return await query.answer(results, cache_time=1, is_personal=True)
-    # ------------------
-
     """ Стандартный инлайн Дурака """
     user = types.User.get_current()
     text = query.query or ''
@@ -69,7 +47,6 @@ async def inline_handler(query: types.InlineQuery):
                 
                 atk_card = None
                 try:
-                    # Убедись, что 'Card' доступен в этом файле
                     atk_card = Card.from_str(text) 
                 except: pass
 
