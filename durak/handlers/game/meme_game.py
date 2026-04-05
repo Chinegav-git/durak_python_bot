@@ -30,7 +30,6 @@ def get_memes_list():
         print(f"Помилка читання стікерів: {e}")
         return []
 
-@db_session
 async def start_new_round_auto(chat_id: int):
     """Автоматичний запуск наступного раунду битви на виліт."""
     session = MemeSession.get(chat_id=chat_id)

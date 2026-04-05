@@ -4,7 +4,6 @@ from loader import dp, bot
 from pony.orm import db_session, commit, select
 from durak.db.meme_models import MemeSession, MemeEntry, MemeVote
 
-@db_session
 async def run_voting(chat_id: int):
     session = MemeSession.get(chat_id=chat_id, status='gathering')
     if not session: return
@@ -32,7 +31,6 @@ async def run_voting(chat_id: int):
     await asyncio.sleep(60) 
     await process_elimination(chat_id)
 
-@db_session
 async def process_elimination(chat_id: int):
     session = MemeSession.get(chat_id=chat_id, status='voting')
     if not session: return
